@@ -1,0 +1,13 @@
+[Unit]
+Description=Zaby Script
+After=sound.target alsa-restore.service
+After=network.target
+
+[Service]
+User=zaby
+WorkingDirectory=/home/zaby/Code/Zaby
+ExecStart=/bin/bash -c 'source /home/zaby/Code/Zaby/zaby-env/bin/activate && python /home/zaby/Code/Zaby/main.py'
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
