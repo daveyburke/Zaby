@@ -8,7 +8,7 @@ Zaby uses Google Cloud Speech-to-Text and Text-to-Speech APIs and is powered by
 Gemini 2.0 Flash. Runs on a Raspberry Pi 5. Bear animatronics use speech
 envelope-tracked mouth movements. 
 
-Here's a demo of the bear: TODO. 
+Here's a demo of the bear: https://x.com/davey_burke/status/1903682259003310308
 
 ## Parts list
 - Raspberry Pi 5 CanaKit - https://www.amazon.com/dp/B0CRSNCJ6Y
