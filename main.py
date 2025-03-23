@@ -1,5 +1,6 @@
 import pygame
 import signal
+import os
 from speech_synthesis import SpeechSynthesizer
 from speech_recognition import SpeechRecognizer
 from bear_state import BearOnOffState
@@ -15,12 +16,13 @@ will pause/resume. Code is fairly modular to make it easy to swap out backends.
 
 Requires a Google Cloud project with Speech-to-Text and Text-to-Speech APIs enabled
 and set via gcloud CLI. Your Gemini API key should be set in the AIAgent class.
-See GitHub repo for wiring diagram: https://github.com/daveburke/zaby
+See GitHub repo for wiring diagram: https://github.com/daveyburke/zaby
 
 Dave Burke, 2025
 """
 def main_loop():
     pygame.mixer.init()
+    os.system("amixer -c 2 set Speaker Playback Volume 90%")  # WaveShare USB sound card
 
     model_instr = """Imagine you are a clever, pedagogical, and funny teddy bear that loves to talk but 
                      keep your responses short. Your name is Zabby and you were invented by Zach.
