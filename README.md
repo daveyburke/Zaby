@@ -12,12 +12,12 @@ Here's a demo of the bear: TODO.
 
 
 ## Parts list
-- Raspberry Pi 5 CanaKit - https://www.amazon.com/dp/B0CRSNCJ6Y?ref_=ppx_hzod_title_dt_b_fed_asin_title_0_0&th=1
+- Raspberry Pi 5 CanaKit - https://www.amazon.com/dp/B0CRSNCJ6Y
 - Story Time Teddy - https://www.cuddle-barn.com/products/storytime-teddie
-- WaveShare USB sound card - https://www.amazon.com/dp/B0CN1C1VPR?ref_=ppx_hzod_title_dt_b_fed_asin_title_0_0
-- DC solid state relay x 2 - https://www.amazon.com/dp/B00B888WVC?ref=ppx_yo2ov_dt_b_fed_asin_title
-- USB battery - https://www.amazon.com/dp/B08T8TDS8S?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1
-- Mini backpack - https://www.amazon.com/dp/B0DL2LTMPP?ref=ppx_yo2ov_dt_b_fed_asin_title&th=1
+- WaveShare USB sound card - https://www.amazon.com/dp/B0CN1C1VPR
+- DC solid state relay x 2 - https://www.amazon.com/dp/B00B888WVC
+- USB battery - https://www.amazon.com/dp/B08T8TDS8S
+- Mini backpack - https://www.amazon.com/dp/B0DL2LTMPP
 
 ## Connections
 The bear has two motors - one for his rotating next and one for his mouth (the motor turns to a stop,
