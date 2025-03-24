@@ -19,11 +19,6 @@ class AIAgent:
             contents=self.conversation,
         )
         text = response.candidates[0].content.parts[0].text
-        text = self._normalize_text(text)
         self.conversation.append({"role": "model", "parts": [{"text": text}]})
 
-        return text
-    
-    def _normalize_text(self, text):
-        text = text.replace("*", "")
         return text

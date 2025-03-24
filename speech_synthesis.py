@@ -27,6 +27,7 @@ class SpeechSynthesizer:
             return
         
         print(text)
+        text = self._normalize_text(text)
         synthesis_input = texttospeech.SynthesisInput(text=text)
     
         try:
@@ -68,3 +69,8 @@ class SpeechSynthesizer:
     def stop_and_cleanup(self):
         self.suspend()
         self.bear.stop_and_cleanup()
+
+    def _normalize_text(self, text):
+        text = text.replace("*", "")
+        text = text.replace("Zaby", "Zabby")  # correct pronounciation!
+        return text
