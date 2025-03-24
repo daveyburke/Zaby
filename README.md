@@ -19,9 +19,7 @@ Here's a demo of the bear: https://x.com/davey_burke/status/1903682259003310308
 - Mini backpack - https://www.amazon.com/dp/B0DL2LTMPP
 
 ## Connections
-The bear has two motors - one for his rotating neck and one for his mouth. The mouth motor turns to a stop,
-resulting in a lot of back EMF and makes it not suitable for a motor controller. The bear has a microswitch
-in his paw which we use to trigger start/stop of the conversation. 
+The bear has two motors - one for his rotating neck and one for his mouth. The mouth motor turns to a stop, resulting in a lot of back EMF and makes it not suitable for a motor controller. The bear has a microswitch in his paw which we use to trigger start/stop of the conversation. 
 
 Raspberry PI GPIO's trigger the solid state DC-to-DC relays to turn on/off the motors (one for each motor).
 The relays just apply the bear battery power to the mouth and neck motors. Speech envelope tracking converts
@@ -30,11 +28,11 @@ root mean square energy into delay times for the mouth motor so the movement app
 Raspberry Pi 5 pinout: https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#view-a-gpio-pinout-for-your-raspberry-pi
 
 Connections:
-- Paw button: connect pin 2 (GPIO 2) and pin 6 (ground) to the paw button. 
-- Mouth: Connect pin 37 (GPIO 26) and pin 39 (ground) to the mouth relay input. 
-- Next: Connect pin 35 (GPIO 19) and pin 39 (ground) to the next relay input. 
-- Battery/relay output: Connect bear battery negative to yellow wire of mouth motor (polarity matters) and blue wire of neck motor. Connect red bear battery positive
-  to one output of each relay. Connect the other output of each relay to the white wire of the mouth motor and orange wire of the neck motor respectively.
+- Paw button: Connect pin 2 (GPIO 2) and pin 6 (ground) to the paw button. 
+- Mouth: Connect pin 37 (GPIO 26) and pin 39 (ground) to the mouth relay inputs (polarity matters).
+- Neck: Connect pin 35 (GPIO 19) and pin 39 (ground) to the neck relay inputs (polarity matters).
+- Battery/relay output: Connect bear's battery negative to yellow wire of mouth motor (polarity matters) and blue wire of neck motor. Connect bear's battery positive wire (through the switch).
+  to one output of each relay (polarity matters). Connect the other output of each relay to the white wire of the mouth motor and orange wire of the neck motor respectively.
 
 ## Python environment
 ```
