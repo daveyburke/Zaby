@@ -8,8 +8,7 @@ Zaby uses Google Cloud Speech-to-Text and Text-to-Speech APIs and is powered by
 Gemini 2.0 Flash. Runs on a Raspberry Pi 5. Bear animatronics use speech
 envelope-tracked mouth movements. 
 
-<img src="https://github.com/daveyburke/zaby/blob/master/Zaby.jpg"/>
-<img src="https://github.com/daveyburke/zaby/blob/master/Zaby Back.jpg"/>
+<img src="Zaby.jpg" width="300"/> <img src="Zaby Back.jpg" width="300"/>
 
 Here's a demo of the bear: https://x.com/davey_burke/status/1903682259003310308
 
@@ -28,7 +27,7 @@ Raspberry PI GPIO's trigger the solid state DC-to-DC relays to turn on/off the m
 The relays just apply the bear battery power to the mouth and neck motors. Speech envelope tracking converts
 root mean square energy into delay times for the mouth motor so the movement approximately tracks the speech. 
 
-<img src="https://github.com/daveyburke/zaby/blob/master/Schematic.jpg"/>
+<img src="Schematic.jpg"/>
 
 ## Python environment
 ```
