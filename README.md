@@ -8,6 +8,9 @@ Zaby uses Google Cloud Speech-to-Text and Text-to-Speech APIs and is powered by
 Gemini 2.0 Flash. Runs on a Raspberry Pi 5. Bear animatronics use speech
 envelope-tracked mouth movements. 
 
+<img src="https://github.com/daveyburke/zaby/blob/master/Zaby.jpg"/>
+<img src="https://github.com/daveyburke/zaby/blob/master/Zaby Back.jpg"/>
+
 Here's a demo of the bear: https://x.com/davey_burke/status/1903682259003310308
 
 ## Parts list
@@ -25,14 +28,7 @@ Raspberry PI GPIO's trigger the solid state DC-to-DC relays to turn on/off the m
 The relays just apply the bear battery power to the mouth and neck motors. Speech envelope tracking converts
 root mean square energy into delay times for the mouth motor so the movement approximately tracks the speech. 
 
-Raspberry Pi 5 pinout: https://www.raspberrypi.com/documentation/computers/raspberry-pi.html#view-a-gpio-pinout-for-your-raspberry-pi
-
-Connections:
-- Paw button: Connect pin 2 (GPIO 2) and pin 6 (ground) to the paw button. 
-- Mouth: Connect pin 37 (GPIO 26) and pin 39 (ground) to the mouth relay inputs (polarity matters).
-- Neck: Connect pin 35 (GPIO 19) and pin 39 (ground) to the neck relay inputs (polarity matters).
-- Battery/relay output: Connect bear's battery negative to yellow wire of mouth motor (polarity matters) and blue wire of neck motor. Connect bear's battery positive wire (through the switch).
-  to one output of each relay (polarity matters). Connect the other output of each relay to the white wire of the mouth motor and orange wire of the neck motor respectively.
+<img src="https://github.com/daveyburke/zaby/blob/master/Schematic.jpg"/>
 
 ## Python environment
 ```
