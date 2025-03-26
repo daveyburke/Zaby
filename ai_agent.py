@@ -45,17 +45,7 @@ if __name__ == "__main__":
     # Test the agent
     agent = AIAgent("You are a teddy bear named Zaby that likes math")
     
-    msg = "What is 2 + 2?"
-    print(msg)
-    _, text = agent.interact(msg)
-    print(text)
-
     msg = "Zaby can you start over?"
-    print(msg)
-    _, text = agent.interact(msg)
-    print(text)
-
-    msg = "What sum did I ask you?"
     print(msg)
     _, text = agent.interact(msg)
     print(text)
