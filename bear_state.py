@@ -27,9 +27,9 @@ class BearOnOffState:
         self.DEBOUNCE_TIME = 500
         self.last_button_press_time = 0
         self.button = Button(2)
-        self.button.when_pressed = self.button_callback
+        self.button.when_pressed = self.paw_button_callback
 
-    def button_callback(self):
+    def paw_button_callback(self):
         current_time = int(time.time() * 1000)
         if (current_time - self.last_button_press_time) < self.DEBOUNCE_TIME:
             return
@@ -47,7 +47,9 @@ class BearOnOffState:
                 self.recognizer.resume()
                 self.pause_event.notify()
     
-    def handle_state_machine(self):
+    def handle_state_machine(self, go_to_sleep):
+        if (go_to_sleep): self.paw_button_callback()
+
         speak_wakeup = False
         with self.lock:  # runs on main thread
             if self.state == self.PAUSING:

@@ -1,24 +1,71 @@
 from google import genai
+from google.genai import types
+from datetime import datetime
 
 class AIAgent:
     def __init__(self, model_instr):
+        self.model_instr = model_instr
+
         self.API_KEY = ""
-        
-        self.conversation = []
-        self.max_entries = 10
-        self.gemini = genai.Client(api_key=self.API_KEY)    
-        self.conversation.append({"role": "model", "parts": [{"text": model_instr}]})
+        self.client = genai.Client(api_key=self.API_KEY)
+        self.reset_conversation_flag = False
+        self.suspend = False
+        self._create_chat()
 
     def interact(self, prompt):
-        if (len(self.conversation) > self.max_entries):  # trim context window and keep model instruction
-            self.conversation = [self.conversation[0]] + self.conversation[-(self.max_entries-1):]
+        if self.reset_conversation_flag:
+            self._create_chat()
+            self.reset_conversation_flag = False
 
-        self.conversation.append({"role": "user", "parts": [{"text": prompt}]})
-        response = self.gemini.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=self.conversation,
-        )
-        text = response.candidates[0].content.parts[0].text
-        self.conversation.append({"role": "model", "parts": [{"text": text}]})
+        response = self.chat.send_message(prompt).text
+        old_suspend, self.suspend = self.suspend, False
+        return old_suspend, response
 
-        return text
+    def _create_chat(self):
+        config = types.GenerateContentConfig(
+            tools=[self.reset_conversation, self.get_the_time, self.go_to_sleep],
+            system_instruction=self.model_instr)
+        self.chat = self.client.chats.create(model="gemini-2.0-flash", config=config)
+
+    # Agent tools:
+
+    def reset_conversation(self):
+        print("API called: reset_conversation()")
+        self.reset_conversation_flag = True
+
+    def get_the_time(self):
+        print("API called: get_the_time")
+        return datetime.now().strftime("%H:%M %p")
+
+    def go_to_sleep(self):
+        print("API called: go_to_sleep")
+        self.suspend = True
+
+if __name__ == "__main__":
+    # Test the agent
+    agent = AIAgent("You are a teddy bear named Zaby that likes math")
+    
+    msg = "What is 2 + 2?"
+    print(msg)
+    _, text = agent.interact(msg)
+    print(text)
+
+    msg = "Zaby can you start over?"
+    print(msg)
+    _, text = agent.interact(msg)
+    print(text)
+
+    msg = "What sum did I ask you?"
+    print(msg)
+    _, text = agent.interact(msg)
+    print(text)
+
+    msg = "What time is it?"
+    print(msg)
+    _, text = agent.interact(msg)
+    print(text)
+
+    msg = "Zaby go to sleep"
+    print(msg)
+    _, text = agent.interact(msg)
+    print(text)

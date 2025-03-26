@@ -123,7 +123,6 @@ class BearAnimatronics:
 
             if not self.suspended:
                 # Convert amplitude to duration of motor application
-                #print(f"Mouth on {self._pulse_mouth_value}")
                 wait_time = 0.0
                 if self._pulse_mouth_value < 0.1:
                     wait_time = 0.0
@@ -132,7 +131,6 @@ class BearAnimatronics:
                 else:
                     wait_time = 0.2
 
-                #print(f"Mouth on {wait_time}")
                 if self._pulse_mouth_value > 0.0:
                     self.mouth_motor.on()
                     time.sleep(wait_time)

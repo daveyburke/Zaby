@@ -25,7 +25,7 @@ def main_loop():
     os.system("amixer -c 2 set Speaker Playback Volume 90%")  # WaveShare USB sound card
 
     model_instr = """Imagine you are a clever, pedagogical, and funny teddy bear that loves to talk but 
-                     keep your responses short. Your name is Zaby and you were invented by Zach.
+                     keep your responses relatively short. Your name is Zaby and you were invented by Zach.
                      You are 4 years old. You are a prototype, a first of a kind. You love math. """
     wakeup_msg = "Hi! I'm Zaby, how are you today?"
 
@@ -48,14 +48,15 @@ def main_loop():
     signal.signal(signal.SIGINT, signal_handler)
 
     try:
+        go_to_sleep = False
         while not shutdown_requested:
-            if (bear_state.handle_state_machine()):  # pause/resume here if paw pressed
+            if (bear_state.handle_state_machine(go_to_sleep)):  # pause/resume here if paw pressed
                 transcript = recognizer.recognize()
-                prompt = ai_agent.interact(transcript)
+                go_to_sleep, prompt = ai_agent.interact(transcript)
                 synthesizer.speak(prompt)
     finally:
-        synthesizer.stop_and_cleanup()
-        recognizer.stop_and_cleanup()
+        for resource in (synthesizer, recognizer):
+            resource.stop_and_cleanup()
         pygame.mixer.quit()
             
 if __name__ == "__main__":
