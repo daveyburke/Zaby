@@ -21,12 +21,19 @@ Here's a demo of the bear: https://x.com/davey_burke/status/1903682259003310308
 - USB battery - https://www.amazon.com/dp/B08T8TDS8S
 - Mini backpack - https://www.amazon.com/dp/B0DL2LTMPP
 
-## Connections
+## Connections / Assembly
+Open the bear housing: cut the ziptie around battery housing, remove 4x screws on housing. Remove the speaker and circuit board. Disconnect the motor-activated internal switch (pulses the mouth motor). 
+Keep the battery housing + switch + mouth motor + neck motor + paw button. Remove bear's "book" and red jacket so it looks steazy. 
+
 The bear has two motors - one for his rotating neck and one for his mouth. The mouth motor turns to a stop, resulting in a lot of back EMF and makes it unsuitable for a motor controller. The bear has a microswitch in his paw which we use to trigger start/stop of the conversation. 
 
 Raspberry PI GPIO's trigger the solid state DC-to-DC relays to turn on/off the motors (one for each motor).
 The relays just apply the bear's battery power to each of the mouth and neck motors. Speech envelope tracking converts
 root mean square energy into delay times for the mouth motor so the movement approximately tracks the speech. 
+
+Close the housing up, put the relays outside of housing but inside the fur. Put the Raspberry Pi, USB battery inside the backpack. Consider something to allow air circulation to the
+Canakit fan, e.g. lego pieces. Use self-adhesive velcro to stick WaveShare speaker and USB stick
+to outside of the backback. Remove one of the speakers (stereo no necessary).
 
 <img src="Schematic.jpg"/>
 
@@ -59,7 +66,7 @@ python main.py
 ```
 
 ## Systemd start on boot
-Run these commands (assumes code lives in /Code/Zaby - edit accordingly):
+Run these commands (assumes code lives in /Code/Zaby - edit the file content accordingly):
 
 ```
 cp zaby.service /etc/systemd/system/
