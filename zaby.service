@@ -1,6 +1,6 @@
 [Unit]
 Description=Zaby Script
-After=network.target
+After=network.target sound.target alsa-restore.service
 Requires=network.target sound.target alsa-restore.service
 
 [Service]
