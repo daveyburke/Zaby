@@ -2,6 +2,7 @@ import threading
 import time
 import numpy as np
 import pygame
+import os
 from gpiozero import Button
 
 class BearOnOffState:
@@ -34,6 +35,9 @@ class BearOnOffState:
         if (current_time - self.last_button_press_time) < self.DEBOUNCE_TIME:
             return
         self.last_button_press_time = current_time
+
+        # Hack - force volume level (sometimes lowers by itself!)
+        os.system("amixer -c 2 set Speaker Playback Volume 90%")  # WaveShare USB sound card
         
         self.beep()
         with self.lock:  # runs on gpio thread
