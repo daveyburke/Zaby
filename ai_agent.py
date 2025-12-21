@@ -6,7 +6,7 @@ class AIAgent:
     def __init__(self, model_instr):
         self.model_instr = model_instr
 
-        self.API_KEY = ""
+        self.API_KEY = "<INSERT_KEY>"
         self.client = genai.Client(api_key=self.API_KEY)
         self.reset_conversation_flag = False
         self.suspend = False
@@ -15,7 +15,7 @@ class AIAgent:
     def interact(self, prompt):
         if self.reset_conversation_flag:
             self._create_chat()
-            self.reset_conversation_flag = False
+            self.reset_conversation_flag = False 
 
         response = self.chat.send_message(prompt).text
         old_suspend, self.suspend = self.suspend, False
@@ -23,9 +23,10 @@ class AIAgent:
 
     def _create_chat(self):
         config = types.GenerateContentConfig(
-            tools=[self.reset_conversation, self.get_the_time, self.go_to_sleep],
-            system_instruction=self.model_instr)
-        self.chat = self.client.chats.create(model="gemini-2.0-flash", config=config)
+            tools=[self.reset_conversation, self.get_the_time, self.go_to_sleep], 
+            system_instruction=self.model_instr, thinking_config=types.ThinkingConfig(thinking_level="minimal"))
+        #self.chat = self.client.chats.create(model="gemini-2.0-flash", config=config)
+        self.chat = self.client.chats.create(model="gemini-3-flash-preview", config=config)
 
     # Agent tools:
 
@@ -40,12 +41,22 @@ class AIAgent:
     def go_to_sleep(self):
         print("API called: go_to_sleep")
         self.suspend = True
-
+    
 if __name__ == "__main__":
     # Test the agent
     agent = AIAgent("You are a teddy bear named Zaby that likes math")
     
+    msg = "What is 2 + 2?"
+    print(msg)
+    _, text = agent.interact(msg)
+    print(text)
+
     msg = "Zaby can you start over?"
+    print(msg)
+    _, text = agent.interact(msg)
+    print(text)
+
+    msg = "What sum did I ask you?"
     print(msg)
     _, text = agent.interact(msg)
     print(text)
