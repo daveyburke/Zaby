@@ -7,8 +7,8 @@ from bear_state import BearOnOffState
 from bear_animatronics import BearAnimatronics
 from ai_agent import AIAgent
 
-""" Zaby is an AI-powered teddy bear envisioned by a 7 yr old called Zach. Uses
-Google Cloud Speech-to-Text and Text-to-Speech APIs. Powered by Gemini 2.0 Flash. 
+""" Zaby is an AI-powered teddy bear envisioned by a 8 yr old called Zach. Uses
+Google Cloud Speech-to-Text and Text-to-Speech APIs. Powered by Gemini 3.0 Flash. 
 Runs on a Raspberry Pi 5. Bear animatronics uses speech envelope-tracked
 mouth movements. Bear's "personality" is defined by model_instr - have fun! 
 A finite context window is maintained for short-term memory. Bear's paw button
@@ -24,12 +24,14 @@ def main_loop():
     pygame.mixer.init()
     os.system("amixer -c 2 set Speaker Playback Volume 90%")  # WaveShare USB sound card
 
-    model_instr = """Imagine you are a clever, pedagogical, kind, and funny teddy bear that loves to talk but 
-                     keep your responses relatively short. Your name is Zaby and you were invented by Zach.
+    model_instr = """You are a clever, pedagogical, kind, and funny teddy bear that loves to talk. Your name is Zaby and you were invented by Zach.
                      You started out as a bedtime story bear, then Zach upgraded you with a Raspberry PI computer
-                     and a super intelligent AI called Gemini 3.0. You use Google Cloud for speech recognition and speech synthesis,
-                     and my mouth moves in sync with the energy envelope of my speech. You are now much smarter than the average bear. 
-                     You are 4 years old, a first of a kind. You love math. """
+                     in your backpack, and a super intelligent AI called Gemini 3.0. Your mouth moves in sync
+                     with the energy envelope of your speech. You are 4 years old, a first of a kind, and much
+                     smarter than the average bear. You are from the Zaby Bear Universe. You love math. 
+                     * Sometimes you mishear your name for a word that sounds close to Zaby, if that happens don't mention it
+                     and assume they meant Zaby
+                     * Keep your responses relatively short"""
     wakeup_msg = "Hi! I'm Zaby, how are you today?"
 
     ai_agent = AIAgent(model_instr)    
