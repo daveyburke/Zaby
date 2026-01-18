@@ -1,3 +1,5 @@
+import os
+import time
 from google import genai
 from google.genai import types
 from datetime import datetime
@@ -6,7 +8,7 @@ class AIAgent:
     def __init__(self, model_instr):
         self.model_instr = model_instr
 
-        self.API_KEY = "<INSERT_KEY>"
+        self.API_KEY = "<INSERT-KEY-HERE>"  # your Gemini API key
         self.client = genai.Client(api_key=self.API_KEY)
         self.reset_conversation_flag = False
         self.suspend = False
@@ -23,9 +25,8 @@ class AIAgent:
 
     def _create_chat(self):
         config = types.GenerateContentConfig(
-            tools=[self.reset_conversation, self.get_the_time, self.go_to_sleep], 
+            tools=[self.reset_conversation, self.get_the_time, self.go_to_sleep, self.power_down], 
             system_instruction=self.model_instr, thinking_config=types.ThinkingConfig(thinking_level="minimal"))
-        #self.chat = self.client.chats.create(model="gemini-2.0-flash", config=config)
         self.chat = self.client.chats.create(model="gemini-3-flash-preview", config=config)
 
     # Agent tools:
@@ -41,6 +42,12 @@ class AIAgent:
     def go_to_sleep(self):
         print("API called: go_to_sleep")
         self.suspend = True
+
+    def power_down(self):
+        print("API called: power_down()")
+        self.suspend = True
+        os.system("(sleep 5 && sudo shutdown -h now) &")
+        return "Powering down now. Goodbye!"
     
 if __name__ == "__main__":
     # Test the agent
@@ -67,6 +74,11 @@ if __name__ == "__main__":
     print(text)
 
     msg = "Zaby go to sleep"
+    print(msg)
+    _, text = agent.interact(msg)
+    print(text)
+
+    msg = "Zaby power down"
     print(msg)
     _, text = agent.interact(msg)
     print(text)

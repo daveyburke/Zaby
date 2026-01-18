@@ -38,7 +38,6 @@ class BearOnOffState:
 
         # Hack - force volume level (sometimes lowers by itself!)
         os.system("amixer -c 2 set Speaker Playback Volume 90%")  # WaveShare USB sound card
-        
         self.beep()
         with self.lock:  # runs on gpio thread
             if self.state == self.RUNNING:
