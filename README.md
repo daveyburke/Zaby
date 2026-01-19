@@ -15,7 +15,7 @@ Here's a demo of the bear: https://x.com/davey_burke/status/1903682259003310308
 
 ## Parts list
 - Story Time Teddy - https://www.cuddle-barn.com/products/storytime-teddie
-- Raspberry Pi 5 CanaKit - https://www.amazon.com/dp/B0CRSNCJ6Y
+- Raspberry Pi 5 SSD CanaKit - https://www.amazon.com/dp/B0DKQS5CXB
 - WaveShare USB sound card - https://www.amazon.com/dp/B0CN1C1VPR
 - DC solid state relay x 2 - https://www.amazon.com/dp/B00B888WVC
 - USB battery - https://www.amazon.com/dp/B08T8TDS8S
@@ -34,6 +34,8 @@ root mean square energy into delay times for the mouth motor so the movement app
 Close the housing up, put the relays outside of housing but inside the fur. Put the Raspberry Pi, USB battery inside the backpack. Consider something to allow air circulation to the
 Canakit fan, e.g. lego pieces. Use self-adhesive velcro to stick WaveShare speaker and USB stick
 to outside of the backback. Remove one of the speakers (stereo no necessary).
+
+Note we use an SSD/NVME Raspberry PI as running from sdcard can get slow (particularly boot)
 
 <img src="Schematic.jpg"/>
 
@@ -85,6 +87,26 @@ sudo systemctl stop zaby.service
 
 sudo journalctl -u zaby.service
 ```
+## Raspberry PI boot optimizations
+```
+# Set default to CLI (no GUI on boot)
+sudo systemctl set-default multi-user.target
+sudo systemctl stop wayvnc.service
+sudo systemctl stop wayvnc-control.service
+sudo systemctl disable wayvnc.service
+sudo systemctl disable wayvnc-control.service
+
+# When you need VNC, SSH in and run:
+sudo systemctl start graphical.target
+
+# Don't wait for full network at boot
+sudo systemctl disable NetworkManager-wait-online.service
+
+# Disable services we don't need
+sudo systemctl disable ModemManager.service
+sudo systemctl disable cups.service
+sudo systemctl disable bluetooth.service
+```
 
 ## Future ideas (aka make this a real product)
 - Android/iOS app to setup Wi-Fi and configure personality
@@ -92,4 +114,5 @@ sudo journalctl -u zaby.service
 - Safety filters
 - Other commands
 - Camera for eyes so the bear can see
+- Kart for bear to drive around and follow you
 
