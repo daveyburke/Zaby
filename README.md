@@ -39,6 +39,8 @@ to outside of the backback. Remove one of the speakers (stereo no necessary).
 
 ## Python environment
 ```
+sudo apt-get update
+sudo apt install libportaudio2 libportaudiocpp0 portaudio19-dev python3-dev
 python -m venv zaby-env
 pip install -r requirements.txt
 source zaby-env/bin/activate
@@ -69,8 +71,8 @@ python main.py
 Run these commands (assumes code lives in /Code/Zaby - edit the file content accordingly):
 
 ```
-cp zaby.service /etc/systemd/system/
-cp asound.conf /etc/
+sudo cp zaby.service /etc/systemd/system/
+sudo cp asound.conf /etc/
 ```
 
 Some useful commands to enable/disable, start/stop, view logs respectively:
