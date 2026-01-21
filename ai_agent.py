@@ -49,9 +49,8 @@ class AIAgent:
     def power_down(self):
         """Shuts down the Raspberry Pi. Only call this function when the user explicitly says 'Zaby please power down' or 'Zaby shut down'. Do not call for general sleep or rest requests."""
         print("API called: power_down()")
+        os.system("(sleep 15 && sudo shutdown -h now) &")
         self.suspend = True
-        os.system("(sleep 5 && sudo shutdown -h now) &")
-        return "Powering down now. Goodbye!"
     
 if __name__ == "__main__":
     # Test the agent
