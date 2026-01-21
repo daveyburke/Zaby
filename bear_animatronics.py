@@ -127,9 +127,9 @@ class BearAnimatronics:
                 if self._pulse_mouth_value < 0.1:
                     wait_time = 0.0
                 elif self._pulse_mouth_value < 0.3:
-                    wait_time = 0.1
+                    wait_time = 0.15
                 else:
-                    wait_time = 0.2
+                    wait_time = 0.25
 
                 if self._pulse_mouth_value > 0.0:
                     self.mouth_motor.on()
