@@ -1,0 +1,12 @@
+# OS generated files
+.DS_Store
+
+# Python bytecode
+__pycache__/
+*/__pycache__/
+
+# Virtual environments
+zaby-env
+
+# Google Cloud ignore file
+cloud_run/.gcloudignore/

@@ -10,9 +10,8 @@ class BearOnOffState:
     the asnychronous nature of button press. Synthesizer/recognizer/animatronics need
     to be able to be suspended/resumed at any time
     """
-    def __init__(self, synthesizer, recognizer, wakeup_msg):
-        self.synthesizer = synthesizer
-        self.recognizer = recognizer
+    def __init__(self, client, wakeup_msg):
+        self.client = client
         self.wakeup_msg = wakeup_msg
 
         self.RUNNING = 0
@@ -42,12 +41,10 @@ class BearOnOffState:
         with self.lock:  # runs on gpio thread
             if self.state == self.RUNNING:
                 self.state = self.PAUSING
-                self.synthesizer.suspend()
-                self.recognizer.suspend()
+                self.client.suspend()
             elif self.state == self.PAUSED:
                 self.state = self.UNPAUSING
-                self.synthesizer.resume()
-                self.recognizer.resume()
+                self.client.resume()
                 self.pause_event.notify()
     
     def handle_state_machine(self, go_to_sleep):
@@ -66,7 +63,7 @@ class BearOnOffState:
                 print("Bear running")
 
         if speak_wakeup:  # outside of lock so it can be interrupted
-            self.synthesizer.speak(self.wakeup_msg) 
+            self.client.speak(self.wakeup_msg)
 
         return self.state == self.RUNNING
         
@@ -83,6 +80,5 @@ class BearOnOffState:
     def stop(self):
         with self.lock:
             self.state = self.TERMINATING
-            self.synthesizer.suspend()
-            self.recognizer.suspend()
+            self.client.suspend()
             self.pause_event.notify()

@@ -1,12 +1,21 @@
 [Unit]
 Description=Zaby Script
-After=network-online.target
-Wants=network-online.target
+
+# Audio routes PyAudio -> PortAudio (pulse hostapi) -> pipewire-pulse -> WaveShare USB.
+# PortAudio's ALSA backend mis-probes the WaveShare (out=0), so we go via PipeWire.
+# Requires `loginctl enable-linger zaby` so user@1000.service (and PipeWire) is up
+# before us; XDG_RUNTIME_DIR points libpulse at the user's socket.
+
+After=network-online.target user@1000.service
+Wants=network-online.target user@1000.service
 
 [Service]
 User=zaby
+SupplementaryGroups=audio
 WorkingDirectory=/home/zaby/Code/Zaby
 Environment=PYTHONUNBUFFERED=1
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+EnvironmentFile=/etc/zaby.env
 ExecStart=/bin/bash -c 'source /home/zaby/Code/Zaby/zaby-env/bin/activate && python /home/zaby/Code/Zaby/main.py'
 Restart=on-failure
 

@@ -6,7 +6,8 @@ to start/stop the conversation. Zaby responds to commands like "tell the time",
 "restart the conversation", and "go to sleep".
 
 Zaby uses Google Cloud Speech-to-Text and Text-to-Speech APIs and is powered by
-Gemini 2.0 Flash. Runs on a Raspberry Pi 5. Bear animatronics include speech
+Gemini 3.0 Flash. It includes a GCP Cloud Run server to reduce network round trips.
+Runs on a Raspberry Pi 5. Bear animatronics include speech
 envelope-tracked mouth movements. 
 
 <img src="Zaby.jpg" width="300"/> <img src="Zaby Back.jpg" width="300"/>
@@ -60,17 +61,21 @@ gcloud init
 gcloud config set project your-project-name
 gcloud auth application-default login
 ```
-## Gemini
-Get an API key from aistudio.google.com and paste into self.API_KEY in ai_agent.py 
 
-## Run from command line
+Get an API key from aistudio.google.com. To deploy server to GCP run:
+```
+GEMINI_API_KEY=<YOUR_GEMINI_API_KEY> ./deploy.sh
+```
+
+## Run from command line, e.g. ssh'd into Raspberry PI:
 ```
 source zaby-env/bin/activate
+export ZABY_SERVER_URL=<YOUR_GCP_SERVER_ADDR>
 python main.py
 ```
 
 ## Systemd start on boot
-Run these commands (assumes code lives in /Code/Zaby - edit the file content accordingly):
+Add a file in /etc/zaby.env that contains ZABY_SERVER_URL=<YOUR_GCP_SERVER_ADDR> and has appropriate user/group permissions (e.g. sudo chown zaby:zaby /etc/zaby.env). Run these:
 
 ```
 sudo cp zaby.service /etc/systemd/system/
@@ -85,7 +90,7 @@ sudo systemctl disable zaby.service
 sudo systemctl start zaby.service
 sudo systemctl stop zaby.service
 
-sudo journalctl -u zaby.service
+sudo journalctl -u zaby.service -f
 ```
 ## Raspberry PI boot optimizations
 ```

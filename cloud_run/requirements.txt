@@ -1,0 +1,6 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+google-cloud-speech==2.31.0
+google-cloud-texttospeech==2.25.0
+google-genai==1.56.0
+numpy==2.2.1
