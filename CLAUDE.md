@@ -4,128 +4,92 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Zaby is an AI-powered animatronic teddy bear that runs on a Raspberry Pi 5. The bear uses Google Cloud Speech-to-Text and Text-to-Speech APIs, powered by Gemini 3.0 Flash. Physical animatronics include speech envelope-tracked mouth movements and neck rotation controlled via GPIO pins.
+Zaby is an AI-powered animatronic teddy bear. The heavy lifting (Google Cloud Speech-to-Text, Gemini 3 Flash agent, Google Cloud Text-to-Speech) runs on a GCP Cloud Run server. The Raspberry Pi 5 in the bear's backpack streams microphone PCM to the server over a WebSocket and plays back synthesized PCM as it arrives, while driving motors for envelope-tracked mouth movement and neck rotation.
 
 ## Development Commands
 
-### Environment Setup
+### Pi-side setup
 ```bash
 python -m venv zaby-env
 source zaby-env/bin/activate
 pip install -r requirements.txt
-```
-
-### Running the Application
-```bash
-source zaby-env/bin/activate
+export ZABY_SERVER_URL=https://zaby-server-xxx.run.app
 python main.py
 ```
 
-### Testing Individual Components
-The following modules can be run standalone for testing:
-- `python ai_agent.py` - Tests AI agent with conversation flow and tool calls
-
-### Systemd Service Management
+### Server deploy
 ```bash
-# View logs
-sudo journalctl -u zaby.service
+cd cloud_run
+GEMINI_API_KEY=<key> ./deploy.sh
+```
 
-# Start/stop service
+### Mac-side smoke test (no GPIO)
+```bash
+export ZABY_SERVER_URL=https://zaby-server-xxx.run.app
+python test_client.py [speak|converse|both]
+```
+
+### Systemd service (Pi)
+```bash
 sudo systemctl start zaby.service
 sudo systemctl stop zaby.service
-
-# Enable/disable auto-start on boot
-sudo systemctl enable zaby.service
-sudo systemctl disable zaby.service
+sudo journalctl -u zaby.service -f
 ```
+`/etc/zaby.env` must contain `ZABY_SERVER_URL=...`.
 
 ## Architecture
 
-### Core Components
+### Pi side (`main.py`, `conversation_client.py`, `bear_state.py`, `bear_animatronics.py`)
 
-The codebase follows a modular architecture with clear separation of concerns:
+**main.py** — entry point. Generates a fresh `client_id` (UUID) each boot so server-side conversation history resets on reboot but survives paw-button pauses. Wires up the animatronics, `ConversationClient`, and `BearOnOffState`, then runs the main loop.
 
-**main.py** - Application entry point and main loop
-- Initializes all components (AI agent, synthesizer, recognizer, animatronics, state manager)
-- Defines bear personality via `model_instr` system prompt
-- Runs main conversation loop: state machine → speech recognition → AI interaction → speech synthesis
-- Handles shutdown signals (SIGTERM, SIGINT)
+**conversation_client.py** — WebSocket client for the server. `converse()` opens `/converse`, streams mic PCM up on a send thread, and receives four kinds of frames back: `transcript` (text), `response` (text), PCM binary frames, and `done` (with `go_to_sleep` / `power_down` flags). PCM bytes are drained into `pcm_q` at network speed by the recv loop; a separate `_playback_loop` thread pulls from the queue and writes to PyAudio at real-time speed. This decoupling keeps the WebSocket lifetime ≈ "Gemini+TTS production time" regardless of reply length, avoiding Cloud Run / LB idle timeouts during playback. `speak()` is a simpler HTTP POST to `/speak` used only for the wakeup line.
 
-**ai_agent.py** - AI conversation management using Gemini
-- Uses Google GenAI SDK with Gemini 3.0 Flash (model: `gemini-3-flash-preview`)
-- Provides tool/function calling capabilities: `reset_conversation()`, `get_the_time()`, `go_to_sleep()`
-- Maintains conversation history until reset is triggered
-- **IMPORTANT**: Gemini API key must be set in `self.API_KEY` (not using environment variable)
+**bear_state.py** — paw-button state machine (RUNNING/PAUSING/PAUSED/UNPAUSING/TERMINATING). GPIO 2 with 500ms debounce; pygame beep on transitions; forces the WaveShare volume to 90% on every press (hardware drifts).
 
-**bear_state.py** - State machine for pause/resume functionality
-- Manages bear states: RUNNING, PAUSING, PAUSED, UNPAUSING, TERMINATING
-- Handles paw button GPIO input (GPIO pin 2) with 500ms debounce
-- Uses threading locks and condition variables for thread-safe state transitions
-- Coordinates suspend/resume across synthesizer, recognizer, and animatronics
-- Generates beep tones using pygame for state transitions
+**bear_animatronics.py** — streaming PCM consumer: `start_audio(rate)`, `feed_audio(pcm)`, `end_audio()`. Computes RMS envelope at 200 Hz in `feed_audio`; a dedicated mouth-motor thread converts RMS → pulse durations (0 / 0.15s / 0.25s). Neck motor runs continuously while audio is streaming.
 
-**speech_recognition.py** - Google Cloud Speech-to-Text integration
-- Streaming recognition with interim results displayed
-- Runs recognition in separate thread
-- Uses PyAudio for audio capture (16kHz, mono, LINEAR16)
-- Supports suspend/resume for state management integration
-- Blocks until final transcript is received
+### Server side (`cloud_run/`)
 
-**speech_synthesis.py** - Google Cloud Text-to-Speech integration
-- Uses Neural2 voice (en-US-Neural2-I by default)
-- Generates MP3 audio to temporary files
-- Plays audio via pygame.mixer while coordinating with bear animatronics
-- Text normalization: strips asterisks, converts "Zaby" → "Zabby" for correct pronunciation
-- Supports suspend/resume for interruption handling
+**server.py** — FastAPI app with `/healthz`, `/speak` (text → PCM bytes), and `/converse` (WebSocket). `/converse` runs STT in a thread while draining incoming audio frames, then streams Gemini tokens through a `SentenceBuffer` so each completed sentence hits TTS before the rest of the reply is generated. First sentence's PCM usually reaches the Pi while later sentences are still synthesizing. `_agents: dict[str, AIAgent]` keys one agent per bear by the `client_id` query param.
 
-**bear_animatronics.py** - Physical motor control and speech animation
-- Controls two motors via GPIO: mouth (pin 26) and neck (pin 19)
-- Performs real-time audio envelope analysis (RMS calculation) at 200 Hz
-- Uses threading to synchronize mouth movements with speech playback
-- Mouth motor pulse duration maps to speech amplitude (0.0s, 0.1s, 0.2s based on RMS thresholds)
-- Neck motor runs continuously during speech
+**ai_agent.py** — Gemini 3 Flash (`gemini-3-flash-preview`) with explicit history management. `interact_stream()` yields text chunks and drives the manual function-call loop: stream → collect any `function_call` parts → execute → append `function_response` → stream again. Automatic function calling is disabled (`AutomaticFunctionCallingConfig(disable=True)`) because automatic FC + streaming hangs (googleapis/python-genai#331). Tools: `reset_conversation`, `get_the_time` (uses `self.tz` from the WS `?tz=` param), `go_to_sleep`, `power_down`. `GEMINI_API_KEY` is read from the environment.
 
-### Threading Architecture
+**speech_recognition.py** — Google Speech streaming recognition. Consumes a `queue.Queue` of PCM bytes fed by the WS handler, returns the final transcript.
 
-The application uses multiple threads that must coordinate:
-- **Main thread**: Runs state machine and conversation loop
-- **GPIO button thread**: Handles paw button callbacks
-- **Recognition thread**: Streams audio to Google Speech API
-- **Envelope tracking thread**: Analyzes audio and triggers mouth movements
-- **Mouth motor thread**: Executes motor pulses based on envelope values
+**speech_synthesis.py** — Google TTS → raw 16-bit PCM at 16 kHz. `_apply_edge_fades` applies 30ms half-cosine ramps to each sentence so back-to-back sentences concatenate without clicks. Text normalization: strips `*`, rewrites `Zaby` → `Zabby` for pronunciation.
 
-All components support `suspend()` and `resume()` to allow graceful interruption when the paw button is pressed.
+### Wire protocol
 
-### GPIO Pin Configuration
+WS `/converse?tz=<IANA>&client_id=<uuid>`:
+- Pi → server: binary PCM frames (16kHz mono int16) until EOS detected by STT.
+- Server → Pi: `{event:"transcript", text}`, `{event:"response", text}`, binary PCM frames, `{event:"done", go_to_sleep, power_down, error}`.
 
-- GPIO 2: Paw button input (triggers pause/resume)
-- GPIO 26: Mouth motor control (solid state relay)
-- GPIO 19: Neck motor control (solid state relay)
+### Pi audio stack
 
-### Audio Configuration
+PyAudio → PortAudio (pulse hostapi) → pipewire-pulse → PipeWire → WaveShare USB (ALSA card 2). PortAudio's ALSA backend mis-probes the WaveShare under systemd, which is why we route through PipeWire. Required one-time setup on the Pi:
+- `loginctl enable-linger zaby` — keeps `user@1000.service` (and PipeWire) running even when no one is logged in.
+- `zaby.service` sets `XDG_RUNTIME_DIR=/run/user/1000` and orders `After=user@1000.service`.
+- The WaveShare card profile must include output; confirm with `pactl list short sinks`.
 
-The system uses WaveShare USB sound card (ALSA card 2):
-- Volume set to 90% in code (enforced on startup and paw button press due to drift issue)
-- Audio output configured via `/etc/asound.conf` pointing to `hw:2,0`
+### GPIO / hardware
+
+- GPIO 2: paw button (input, pull-up)
+- GPIO 26: mouth motor (on/off pulses via SSR — high back-EMF, duration encodes amplitude)
+- GPIO 19: neck motor (on while audio is playing)
+- WaveShare USB audio on `hw:2,0`; `asound.conf` sets it as `pcm.!default`.
 
 ## Important Implementation Notes
 
-### Gemini API Key
-The Gemini API key is hardcoded in `ai_agent.py` as `self.API_KEY`. This should be set to a valid key from aistudio.google.com before running.
+### Auth
+- **Gemini**: `GEMINI_API_KEY` env var on the Cloud Run service (set by `cloud_run/deploy.sh`).
+- **GCP STT/TTS**: Application Default Credentials inside the Cloud Run container (the service's runtime SA needs Speech + TTS roles).
 
-### Google Cloud Authentication
-Speech-to-Text and Text-to-Speech use Google Cloud Application Default Credentials. Must run:
-```bash
-gcloud init
-gcloud config set project your-project-name
-gcloud auth application-default login
-```
+### Personality
+System prompt lives in `cloud_run/server.py` as `MODEL_INSTR`. Editing it requires redeploying the server.
 
-### Personality Customization
-Bear personality is defined in `main.py` via the `model_instr` variable. This system prompt controls the bear's behavior, tone, knowledge domain, and response style.
+### Suspend/resume contract
+Anything that drives audio or motors should expose `suspend()` and `resume()` and check `self.suspended` in its loops so paw-button presses can interrupt mid-utterance.
 
-### Suspend/Resume Pattern
-When adding new components, implement `suspend()` and `resume()` methods to integrate with the state machine. Components should check `self.suspended` flag in loops and exit gracefully.
-
-### Motor Control
-The mouth motor has high back EMF and is controlled with simple on/off pulses rather than PWM. Duration of pulses (not duty cycle) controls movement amplitude.
+### History lifecycle
+Per-`client_id` `AIAgent` instances live in server-side memory. A Pi reboot → new UUID → fresh history. Paw-button pause/resume → same UUID → history preserved. No cross-container persistence — a Cloud Run instance recycle also drops history.

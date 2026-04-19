@@ -1,5 +1,6 @@
 import json
 import os
+import queue
 import socket
 import threading
 from urllib.parse import urlencode
@@ -38,9 +39,10 @@ class ConversationClient:
     raw 16-bit PCM reply chunks, and plays them back through the bear animatronics
     as they arrive."""
 
-    def __init__(self, server_url, bear_animatronics, rate=16000):
+    def __init__(self, server_url, bear_animatronics, client_id, rate=16000):
         self.server_url = server_url.rstrip("/")
         self.bear_animatronics = bear_animatronics
+        self.client_id = client_id  # identifies this bear's history on the server
         self.rate = rate
         self.chunk = int(rate / 10)  # 100ms chunks
 
@@ -60,11 +62,20 @@ class ConversationClient:
         power_down = False
         done_streaming = threading.Event()
         send_thread = None
-        out_stream = None
-        audio_started = False
+
+        # Decouple WS recv from audio playback: recv drains PCM into pcm_q at
+        # network speed (lets the WS close in seconds even for multi-minute
+        # replies — Cloud Run was timing out the WS otherwise) while a separate
+        # thread plays from the queue at real-time speed.
+        pcm_q: queue.Queue = queue.Queue()
+        playback_thread = threading.Thread(target=self._playback_loop, args=(pcm_q,), daemon=True)
+        playback_thread.start()
 
         try:
-            ws_url = self._http_to_ws(self.server_url) + "/converse?" + urlencode({"tz": _local_tz_name()})
+            ws_url = self._http_to_ws(self.server_url) + "/converse?" + urlencode({
+                "tz": _local_tz_name(),
+                "client_id": self.client_id,
+            })
             self.ws = websocket.create_connection(ws_url, timeout=30)
             self.ws.settimeout(0.5)  # short recv timeout so we can notice suspend
 
@@ -113,13 +124,7 @@ class ConversationClient:
                         power_down = msg.get("power_down", False)
                         break
                 elif opcode == websocket.ABNF.OPCODE_BINARY:
-                    if not audio_started:
-                        out_stream = self._open_output_stream()
-                        self.bear_animatronics.start_audio(PCM_SAMPLE_RATE)
-                        audio_started = True
-                    if not self.suspended:
-                        self.bear_animatronics.feed_audio(data)
-                        out_stream.write(data)
+                    pcm_q.put(data)
                 elif opcode == websocket.ABNF.OPCODE_CLOSE:
                     break
 
@@ -135,23 +140,48 @@ class ConversationClient:
                 self.stream.stop_stream()
                 self.stream.close()
                 self.stream = None
-            if audio_started:
-                self.bear_animatronics.end_audio()
-            if out_stream:
-                out_stream.stop_stream()
-                out_stream.close()
             if self.ws:
                 try:
                     self.ws.close()
                 except Exception:
                     pass
                 self.ws = None
+            pcm_q.put(None)
+            playback_thread.join()
             print("Conversation round complete")
 
         if power_down:
             os.system("(sleep 15 && sudo shutdown -h now) &")
 
         return go_to_sleep, power_down
+
+    def _playback_loop(self, pcm_q):
+        """Pulls PCM chunks from pcm_q and plays them in real time. Runs until
+        a None sentinel arrives or self.suspended flips True."""
+        out_stream = None
+        audio_started = False
+        try:
+            while True:
+                try:
+                    data = pcm_q.get(timeout=0.5)
+                except queue.Empty:
+                    if self.suspended:
+                        break
+                    continue
+                if data is None or self.suspended:
+                    break
+                if not audio_started:
+                    out_stream = self._open_output_stream()
+                    self.bear_animatronics.start_audio(PCM_SAMPLE_RATE)
+                    audio_started = True
+                self.bear_animatronics.feed_audio(data)
+                out_stream.write(data)
+        finally:
+            if audio_started:
+                self.bear_animatronics.end_audio()
+            if out_stream:
+                out_stream.stop_stream()
+                out_stream.close()
 
     def speak(self, text):
         """Synthesize and play a single utterance (used for the wakeup line)."""

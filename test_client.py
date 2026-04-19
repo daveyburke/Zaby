@@ -44,7 +44,7 @@ def main():
     mode = sys.argv[1] if len(sys.argv) > 1 else "both"
 
     pygame.mixer.init()
-    client = ConversationClient(server_url, StubBear())
+    client = ConversationClient(server_url, StubBear(), client_id="test-client")
 
     try:
         if mode in ("speak", "both"):

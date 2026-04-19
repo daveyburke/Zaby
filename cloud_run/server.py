@@ -50,9 +50,21 @@ MODEL_INSTR = """You are a clever, pedagogical, kind, and funny teddy bear that 
                  if you're asked what you like to eat). Sometimes you mis-hear your name that sounds close to
                  Zaby - if that happens don't mention it and assume they meant Zaby"""
 
-ai_agent = AIAgent(MODEL_INSTR)
 recognizer = SpeechRecognizer()
 synthesizer = SpeechSynthesizer()
+
+# One AIAgent per bear, keyed by client_id sent on the WS handshake. The Pi
+# regenerates its client_id on boot so history resets then; paw-button
+# pause/resume keeps the same ID so history survives across rounds.
+_agents: dict[str, AIAgent] = {}
+
+
+def get_agent(client_id: str) -> AIAgent:
+    agent = _agents.get(client_id)
+    if agent is None:
+        agent = AIAgent(MODEL_INSTR)
+        _agents[client_id] = agent
+    return agent
 
 app = FastAPI()
 
@@ -85,8 +97,9 @@ async def converse(ws: WebSocket):
     await ws.accept()
     loop = asyncio.get_event_loop()
 
-    # Single-user bear: stash the Pi's IANA timezone on the agent so get_the_time
-    # returns local time. Sent as ?tz= on the WS URL.
+    ai_agent = get_agent(ws.query_params.get("client_id") or "default")
+    # Stash the Pi's IANA timezone on the agent so get_the_time returns local
+    # time. Sent as ?tz= on the WS URL.
     ai_agent.tz = ws.query_params.get("tz") or "UTC"
 
     audio_queue: queue.Queue = queue.Queue()
@@ -122,26 +135,40 @@ async def converse(ws: WebSocket):
     go_to_sleep = False
     power_down = False
     error = None
+    response_chunks: list[str] = []
     try:
         await ws.send_json({"event": "transcript", "text": transcript})
 
         if transcript:
-            # Non-streaming Gemini (streaming + automatic function calling hangs
-            # in google-genai; see googleapis/python-genai#331). Sentence-level
-            # TTS pipeline still lets first-sentence audio reach the Pi while
-            # later sentences are still synthesizing.
-            go_to_sleep, power_down, response_text = await loop.run_in_executor(
-                None, ai_agent.interact, transcript)
-            await ws.send_json({"event": "response", "text": response_text})
-
+            # Stream Gemini tokens straight into the SentenceBuffer so the first
+            # sentence can hit TTS before the rest of the reply is generated.
             sentence_q: asyncio.Queue = asyncio.Queue()
             pcm_q: asyncio.Queue = asyncio.Queue()
+            chunk_q: queue.Queue = queue.Queue()
+
+            def drain_gemini_stream():
+                try:
+                    for chunk in ai_agent.interact_stream(transcript):
+                        chunk_q.put(chunk)
+                except Exception as e:
+                    chunk_q.put(e)
+                finally:
+                    chunk_q.put(None)
+
+            threading.Thread(target=drain_gemini_stream, daemon=True).start()
 
             async def produce_sentences():
                 sb = SentenceBuffer()
                 try:
-                    for s in sb.feed(response_text):
-                        await sentence_q.put(s)
+                    while True:
+                        chunk = await loop.run_in_executor(None, chunk_q.get)
+                        if chunk is None:
+                            break
+                        if isinstance(chunk, Exception):
+                            raise chunk
+                        response_chunks.append(chunk)
+                        for s in sb.feed(chunk):
+                            await sentence_q.put(s)
                     for s in sb.flush():
                         await sentence_q.put(s)
                 finally:
@@ -165,6 +192,10 @@ async def converse(ws: WebSocket):
                         await ws.send_bytes(pcm[i:i + PCM_CHUNK])
 
             await asyncio.gather(produce_sentences(), synth_worker(), send_pcm())
+
+            go_to_sleep = ai_agent.suspend
+            power_down = ai_agent.power_down_flag
+            await ws.send_json({"event": "response", "text": "".join(response_chunks)})
     except WebSocketDisconnect:
         return
     except Exception as e:

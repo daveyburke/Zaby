@@ -4,6 +4,9 @@ from google.genai import types
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+MODEL = "gemini-3-flash-preview"
+
+
 class AIAgent:
     def __init__(self, model_instr):
         self.model_instr = model_instr
@@ -14,17 +17,66 @@ class AIAgent:
         self.suspend = False
         self.power_down_flag = False
         self.tz = "UTC"  # overridden per-request from the Pi's WS handshake
-        self._create_chat()
+        self.history: list[types.Content] = []
+        self._config = types.GenerateContentConfig(
+            tools=[self.reset_conversation, self.get_the_time, self.go_to_sleep, self.power_down],
+            system_instruction=self.model_instr,
+            thinking_config=types.ThinkingConfig(thinking_level="minimal"),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
+        )
+
+    def interact_stream(self, prompt):
+        """Yields response text chunks as Gemini emits them. After exhaustion,
+        self.suspend / self.power_down_flag reflect any tool calls made.
+
+        Manual function-call dispatch — automatic function calling hangs under
+        streaming (see googleapis/python-genai#331), so we drive the tool loop
+        ourselves and manage chat history explicitly."""
+        self.suspend = False
+        self.power_down_flag = False
+
+        self.history.append(types.Content(role="user", parts=[types.Part(text=prompt)]))
+
+        while True:
+            model_parts: list[types.Part] = []
+            function_calls = []
+            stream = self.client.models.generate_content_stream(
+                model=MODEL, contents=self.history, config=self._config,
+            )
+            for chunk in stream:
+                if not chunk.candidates or not chunk.candidates[0].content:
+                    continue
+                for part in chunk.candidates[0].content.parts or []:
+                    model_parts.append(part)
+                    if getattr(part, "function_call", None):
+                        function_calls.append(part.function_call)
+                    elif getattr(part, "text", None) and not getattr(part, "thought", False):
+                        yield part.text
+
+            self.history.append(types.Content(role="model", parts=model_parts))
+
+            if not function_calls:
+                # Apply reset after the acknowledgment streams — we can't wipe
+                # history mid-turn without breaking the function_call /
+                # function_response pairing the API requires.
+                if self.reset_conversation_flag:
+                    self.history = []
+                    self.reset_conversation_flag = False
+                return
+
+            response_parts = [
+                types.Part.from_function_response(
+                    name=fc.name,
+                    response={"result": self._dispatch(fc.name, dict(fc.args or {}))},
+                )
+                for fc in function_calls
+            ]
+            self.history.append(types.Content(role="user", parts=response_parts))
 
     def interact(self, prompt):
-        if self.reset_conversation_flag:
-            self._create_chat()
-            self.reset_conversation_flag = False
-
-        response = self.chat.send_message(prompt).text
-        old_suspend, self.suspend = self.suspend, False
-        old_power_down, self.power_down_flag = self.power_down_flag, False
-        return old_suspend, old_power_down, response
+        """Non-streaming wrapper — collects the full response. Used by tests."""
+        text = "".join(self.interact_stream(prompt))
+        return self.suspend, self.power_down_flag, text
 
     def list_models(self):
         """Returns names of models that support generateContent."""
@@ -35,12 +87,12 @@ class AIAgent:
                 names.append(m.name)
         return names
 
-    def _create_chat(self):
-        # Optimized for fastest not smartest model for fluid conversation
-        config = types.GenerateContentConfig(
-            tools=[self.reset_conversation, self.get_the_time, self.go_to_sleep, self.power_down], 
-            system_instruction=self.model_instr, thinking_config=types.ThinkingConfig(thinking_level="minimal"))
-        self.chat = self.client.chats.create(model="gemini-3-flash-preview", config=config)
+    def _dispatch(self, name, args):
+        fn = getattr(self, name, None)
+        if not callable(fn):
+            return f"unknown function: {name}"
+        result = fn(**args)
+        return result if result is not None else "ok"
 
     # Agent tools:
 

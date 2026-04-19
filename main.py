@@ -1,5 +1,6 @@
 import os
 import signal
+import uuid
 
 import pygame
 
@@ -29,8 +30,12 @@ def main_loop():
 
     wakeup_msg = "Hi! I'm Zaby, how are you today?"
 
+    # Fresh client_id every boot → server drops prior conversation history;
+    # paw-button pause/resume keeps the same ID so history survives.
+    client_id = uuid.uuid4().hex
+
     bear_animatronics = BearAnimatronics()
-    client = ConversationClient(server_url, bear_animatronics)
+    client = ConversationClient(server_url, bear_animatronics, client_id=client_id)
     bear_state = BearOnOffState(client, wakeup_msg)
 
     bear_state.beep()  # power on beep
