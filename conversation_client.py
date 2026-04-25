@@ -208,12 +208,11 @@ class ConversationClient:
     def suspend(self):
         self.suspended = True
         self.bear_animatronics.suspend()
-        # Don't close self.ws here. suspend() is reached from the SIGTERM
-        # handler on the main thread, which may itself be inside
-        # self.ws.recv_data() — closing the socket from the same thread
-        # already in recv deadlocks websocket-client. The recv loop's 0.5s
-        # timeout picks up self.suspended and exits; converse()'s finally
-        # block then closes the socket cleanly.
+        if self.ws:
+            try:
+                self.ws.close()
+            except Exception:
+                pass
 
     def resume(self):
         self.suspended = False

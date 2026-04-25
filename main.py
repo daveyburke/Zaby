@@ -1,5 +1,6 @@
 import os
 import signal
+import threading
 import uuid
 
 import pygame
@@ -49,7 +50,12 @@ def main_loop():
             os._exit(1)
         print("\nShutdown signal received...")
         shutdown_requested = True
-        bear_state.stop()
+        # Run on a worker thread — bear_state.stop() ends up calling
+        # ws.close(), which deadlocks if invoked on the same thread that's
+        # inside ws.recv_data(). The paw-button path works because gpiozero
+        # already runs its callback on a separate thread; this gives the
+        # SIGTERM path the same property.
+        threading.Thread(target=bear_state.stop, daemon=True).start()
     signal.signal(signal.SIGTERM, signal_handler)
     signal.signal(signal.SIGINT, signal_handler)
 
