@@ -174,8 +174,12 @@ class ConversationClient:
                     out_stream = self._open_output_stream()
                     self.bear_animatronics.start_audio(PCM_SAMPLE_RATE)
                     audio_started = True
-                self.bear_animatronics.feed_audio(data)
+                # Write first, THEN feed the envelope. write() blocks until
+                # PortAudio's buffer accepts the data, so by the time we drive
+                # the mouth, the chunk is queued ~ where it will play. Calling
+                # feed_audio first leads the audio by one chunk (~128 ms).
                 out_stream.write(data)
+                self.bear_animatronics.feed_audio(data)
         finally:
             if audio_started:
                 self.bear_animatronics.end_audio()
@@ -204,11 +208,12 @@ class ConversationClient:
     def suspend(self):
         self.suspended = True
         self.bear_animatronics.suspend()
-        if self.ws:
-            try:
-                self.ws.close()
-            except Exception:
-                pass
+        # Don't close self.ws here. suspend() is reached from the SIGTERM
+        # handler on the main thread, which may itself be inside
+        # self.ws.recv_data() — closing the socket from the same thread
+        # already in recv deadlocks websocket-client. The recv loop's 0.5s
+        # timeout picks up self.suspended and exits; converse()'s finally
+        # block then closes the socket cleanly.
 
     def resume(self):
         self.suspended = False
@@ -234,8 +239,8 @@ class ConversationClient:
             for chunk in chunks:
                 if self.suspended or not chunk:
                     break
-                self.bear_animatronics.feed_audio(chunk)
                 out_stream.write(chunk)
+                self.bear_animatronics.feed_audio(chunk)
         finally:
             self.bear_animatronics.end_audio()
             out_stream.stop_stream()

@@ -4,6 +4,9 @@ import numpy as np
 from gpiozero import OutputDevice
 
 class BearAnimatronics:
+    NECK_SILENCE_RMS = 0.03
+    NECK_SILENCE_HOLDOFF = 40  # windows at 200 Hz ≈ 200 ms
+
     def __init__(self):
         self.mouth_motor = OutputDevice(26)
         self.neck_motor = OutputDevice(19)
@@ -15,6 +18,7 @@ class BearAnimatronics:
         self._pulse_mouth_value = 0.0
         self._pcm_buffer = b""
         self._bytes_per_update = 0
+        self._neck_silence_windows = 0
 
         self._mouth_thread = threading.Thread(target=self._mouth_thread_loop, daemon=True)
         self._mouth_thread.start()
@@ -24,6 +28,7 @@ class BearAnimatronics:
         samples_per_update = int(sample_rate / self.envelope_refresh_rate)
         self._bytes_per_update = samples_per_update * 2  # 16-bit signed PCM
         self._pcm_buffer = b""
+        self._neck_silence_windows = 0
         self.neck_motor.on()
 
     def feed_audio(self, pcm_chunk):
@@ -36,11 +41,21 @@ class BearAnimatronics:
             self._pcm_buffer = self._pcm_buffer[self._bytes_per_update:]
             samples = np.frombuffer(window, dtype=np.int16).astype(np.float32) / 32768.0
             rms = float(np.sqrt(np.mean(samples ** 2)))
+
+            if rms < self.NECK_SILENCE_RMS:
+                self._neck_silence_windows += 1
+                if self._neck_silence_windows == self.NECK_SILENCE_HOLDOFF:
+                    self.neck_motor.off()
+            else:
+                if self._neck_silence_windows >= self.NECK_SILENCE_HOLDOFF:
+                    self.neck_motor.on()
+                self._neck_silence_windows = 0
+
             self._pulse_mouth_value = rms
             self.mouth_pulse_event.set()
             if rms < 0.1:
                 print("\r---", end="")
-            elif rms < 0.3:
+            elif rms < 0.15:
                 print("\r-o-", end="")
             else:
                 print("\r-O-", end="")
@@ -74,8 +89,8 @@ class BearAnimatronics:
             value = self._pulse_mouth_value
             if value < 0.1:
                 wait_time = 0.0
-            elif value < 0.3:
-                wait_time = 0.15
+            elif value < 0.15:
+                wait_time = 0.08
             else:
                 wait_time = 0.25
 
