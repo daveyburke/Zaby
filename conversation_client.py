@@ -1,8 +1,11 @@
 import json
 import os
 import queue
+import re
 import socket
+import subprocess
 import threading
+import time
 from urllib.parse import urlencode
 
 import pyaudio
@@ -12,6 +15,8 @@ import websocket  # websocket-client
 
 PCM_SAMPLE_RATE = 16000  # Must match cloud_run/speech_synthesis.py.
 PCM_CHUNK = 4 * 1024
+BATTERY_CHECK_INTERVAL = 10 * 60  # seconds; cap PMIC polling during conversation
+BATTERY_LOW_VOLTS = 4.75  # earlier than the firmware's ~4.65V undervoltage trip
 
 
 def _local_tz_name():
@@ -51,6 +56,8 @@ class ConversationClient:
 
         self.stream = None
         self.ws = None
+        self._last_battery_check = float("-inf")  # fires on first converse()
+        self.last_voltage = None  # refreshed at the start of each converse()
 
     def converse(self):
         """Runs one full round: capture audio → recognize → AI reply → speak.
@@ -71,11 +78,15 @@ class ConversationClient:
         playback_thread = threading.Thread(target=self._playback_loop, args=(pcm_q,), daemon=True)
         playback_thread.start()
 
+        # Refresh the battery reading once per conversation so the server-side
+        # get_battery_voltage tool answers with current data.
+        self.last_voltage = self._read_battery_voltage()
+
         try:
-            ws_url = self._http_to_ws(self.server_url) + "/converse?" + urlencode({
-                "tz": _local_tz_name(),
-                "client_id": self.client_id,
-            })
+            params = {"tz": _local_tz_name(), "client_id": self.client_id}
+            if self.last_voltage is not None:
+                params["voltage"] = f"{self.last_voltage:.3f}"
+            ws_url = self._http_to_ws(self.server_url) + "/converse?" + urlencode(params)
             self.ws = websocket.create_connection(ws_url, timeout=30)
             self.ws.settimeout(0.5)  # short recv timeout so we can notice suspend
 
@@ -152,8 +163,38 @@ class ConversationClient:
 
         if power_down:
             os.system("(sleep 15 && sudo shutdown -h now) &")
+        else:
+            self._maybe_check_battery()
 
         return go_to_sleep, power_down
+
+    def _read_battery_voltage(self):
+        """Read PMIC EXT5V_V via vcgencmd. Returns float volts or None if the
+        call fails (e.g. running off-Pi for the smoke test)."""
+        try:
+            volts = subprocess.run(["vcgencmd", "pmic_read_adc", "EXT5V_V"], capture_output=True, text=True)
+            # Format is `EXT5V_V volt(24)=4.88698000V` — (24) is the channel index, not volts.
+            return float(re.search(r"=([0-9.]+)V", volts.stdout).group(1))
+        except Exception as e:
+            print(f"Battery read failed: {e}")
+            return None
+
+    def _maybe_check_battery(self):
+        """Once per BATTERY_CHECK_INTERVAL, log self.last_voltage and, if it's
+        below BATTERY_LOW_VOLTS, speak a low-battery warning. We trip earlier
+        than the firmware's undervoltage flag so the bear has time to ask for
+        a charge before the USB pack falls off its discharge cliff."""
+        now = time.monotonic()
+        if now - self._last_battery_check < BATTERY_CHECK_INTERVAL:
+            return
+        self._last_battery_check = now
+        voltage = self.last_voltage
+        if voltage is None:
+            return
+        low = voltage < BATTERY_LOW_VOLTS
+        print(f"Voltage: {voltage:.3f}V {'⚠️  Low' if low else '✅ OK'}")
+        if low:
+            self.speak("Uh oh, my battery is low please charge me!")
 
     def _playback_loop(self, pcm_q):
         """Pulls PCM chunks from pcm_q and plays them in real time. Runs until

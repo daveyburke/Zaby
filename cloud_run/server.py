@@ -101,6 +101,12 @@ async def converse(ws: WebSocket):
     # Stash the Pi's IANA timezone on the agent so get_the_time returns local
     # time. Sent as ?tz= on the WS URL.
     ai_agent.tz = ws.query_params.get("tz") or "UTC"
+    # Latest battery voltage from the Pi for the get_battery_voltage tool.
+    voltage_str = ws.query_params.get("voltage")
+    try:
+        ai_agent.battery_voltage = float(voltage_str) if voltage_str else None
+    except ValueError:
+        ai_agent.battery_voltage = None
 
     audio_queue: queue.Queue = queue.Queue()
     transcript_holder = {"value": ""}

@@ -6,6 +6,8 @@ from gpiozero import OutputDevice
 class BearAnimatronics:
     NECK_SILENCE_RMS = 0.03
     NECK_SILENCE_HOLDOFF = 40  # windows at 200 Hz ≈ 200 ms
+    MOUTH_CLOSED_RMS = 0.1     # below this: no mouth pulse
+    MID_MOUTH_RMS = 0.15       # below this: short pulse; above: long pulse
 
     def __init__(self):
         self.mouth_motor = OutputDevice(26)
@@ -53,17 +55,21 @@ class BearAnimatronics:
 
             self._pulse_mouth_value = rms
             self.mouth_pulse_event.set()
-            if rms < 0.1:
-                print("\r---", end="")
-            elif rms < 0.15:
-                print("\r-o-", end="")
+            # Trailing \r parks the cursor at col 0 after each update, so any
+            # log line that prints mid-playback overwrites the indicator
+            # cleanly instead of being prefixed by it.
+            if rms < self.MOUTH_CLOSED_RMS:
+                print("---\r", end="", flush=True)
+            elif rms < self.MID_MOUTH_RMS:
+                print("-o-\r", end="", flush=True)
             else:
-                print("\r-O-", end="")
+                print("-O-\r", end="", flush=True)
 
     def end_audio(self):
         """Finish a streaming utterance."""
         self.neck_motor.off()
-        print("")
+        # Wipe the last mouth indicator so it doesn't linger on the log.
+        print("\r\033[K", end="", flush=True)
 
     def suspend(self):
         self.suspended = True
@@ -87,9 +93,9 @@ class BearAnimatronics:
                 continue
 
             value = self._pulse_mouth_value
-            if value < 0.1:
+            if value < self.MOUTH_CLOSED_RMS:
                 wait_time = 0.0
-            elif value < 0.15:
+            elif value < self.MID_MOUTH_RMS:
                 wait_time = 0.08
             else:
                 wait_time = 0.25

@@ -17,9 +17,16 @@ class AIAgent:
         self.suspend = False
         self.power_down_flag = False
         self.tz = "UTC"  # overridden per-request from the Pi's WS handshake
+        self.battery_voltage = None  # overridden per-request from the Pi's WS handshake
         self.history: list[types.Content] = []
         self._config = types.GenerateContentConfig(
-            tools=[self.reset_conversation, self.get_the_time, self.go_to_sleep, self.power_down],
+            tools=[
+                self.reset_conversation,
+                self.get_the_time,
+                self.get_battery_voltage,
+                self.go_to_sleep,
+                self.power_down,
+            ],
             system_instruction=self.model_instr,
             thinking_config=types.ThinkingConfig(thinking_level="minimal"),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
@@ -109,6 +116,13 @@ class AIAgent:
         except ZoneInfoNotFoundError:
             zone = ZoneInfo("UTC")
         return datetime.now(zone).strftime("%I:%M %p")
+
+    def get_battery_voltage(self):
+        """Returns the bear's battery voltage in Volts. Call when the user asks about the battery, voltage, charge level, or how much power is left. Examples: 'Zaby what's your battery voltage?', 'Zaby how charged are you?', 'Zaby is your battery low?'."""
+        print(f"API called: get_battery_voltage (V={self.battery_voltage})")
+        if self.battery_voltage is None:
+            return "unknown"
+        return f"{self.battery_voltage:.2f}V"
 
     def go_to_sleep(self):
         """Puts Zaby to sleep (pause mode). Only call this function when the user explicitly says 'Zaby go to sleep' or 'Zaby sleep'. Do not call for general goodbye or end of conversation."""
