@@ -16,7 +16,7 @@ import websocket  # websocket-client
 PCM_SAMPLE_RATE = 16000  # Must match cloud_run/speech_synthesis.py.
 PCM_CHUNK = 4 * 1024
 BATTERY_CHECK_INTERVAL = 10 * 60  # seconds; cap PMIC polling during conversation
-BATTERY_LOW_VOLTS = 4.75  # earlier than the firmware's ~4.65V undervoltage trip
+BATTERY_LOW_VOLTS = 4.67  # earlier than the firmware's ~4.65V undervoltage trip
 
 
 def _local_tz_name():
