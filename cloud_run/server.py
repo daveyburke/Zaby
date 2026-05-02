@@ -141,7 +141,7 @@ _PAGE = """<!doctype html>
 <h1 style="text-align:center;margin:0 0 1em">Zaby+</h1>
 
 <h2>Wakeup Message</h2>
-<p style="color:#666">What Zaby says when he wakes up. The Pi fetches this once at boot.</p>
+<p style="color:#666">What Zaby says when he wakes up.</p>
 <form method="POST" action="/memory/wakeup">
   <textarea name="content" rows="2" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:14px">{wakeup}</textarea>
   <p>
