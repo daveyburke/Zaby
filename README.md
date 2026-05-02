@@ -1,28 +1,27 @@
 # Zaby
-Zaby is an AI-powered teddy bear envisioned by a 7 yr old called Zach. 
+Zaby is an AI-powered teddy bear envisioned by a 7 yr old called Zach and built by his dad Dave.
 Zaby is a clever, pedagogical, and funny teddy bear that loves talking math (although
 you can easily change his personality via model_instr in main.py). Press his paw
-to start/stop the conversation. Zaby responds to a handful of voice commands
-listed below.
+to start/stop the conversation. Zaby has a long-term memory and ability to change his
+personality. Zaby responds to a handful of voice commands listed below.
 
 Zaby uses Google Cloud Speech-to-Text and Text-to-Speech APIs and is powered by
 Gemini 3.0 Flash. It includes a GCP Cloud Run server to reduce network round trips.
 Runs on a Raspberry Pi 5. Bear animatronics include speech
-envelope-tracked mouth movements. 
+envelope-tracked mouth movements and synchronized neck movements.
 
 Safety filters and prompts are applied to keep the converstation child appropriate.
-
 
 <img src="Zaby.jpg" width="300"/> <img src="Zaby Back.jpg" width="300"/>
 
 Here's a demo of the bear: https://x.com/davey_burke/status/1903682259003310308
 
-## Memory and System Prompt
+## Memory and system prompt (personality)
 Zaby uses a long-term memory inspired by OpenClaw. Memory is stored in a markdown file and
 an sqlite vector database is used for retrieval augmented generation. The retrieval uses both
-cosine similarity and full text search with fused ranking. The system prompt is bootsrapped with
-the memory and lookup happens at inference time with a search_memory tool. Both the system prompt
-and the memory file can be viewed/edited at ZABY_SERVER_URL/memory with username/password YOUR_MEMORY_PASSWORD.
+cosine similarity and full text search with fused ranking. The system prompt is bootstrapped with
+the memory and look up happens at inference time with a search_memory() tool. Both the system prompt (personality)
+and the memory file can be viewed/edited at ZABY_SERVER_URL/memory (username/password is YOUR_MEMORY_PASSWORD).
 
 ## Voice tools
 The Gemini agent (cloud_run/ai_agent.py) is wired up with these tools — phrase
@@ -32,12 +31,12 @@ the request naturally and Zaby will pick the right one:
 | ---- | ------------ | --------------- |
 | `get_the_time` | Speaks the current time in the Pi's local timezone | "Zaby, what time is it?" |
 | `get_battery_voltage` | Speaks the bear's input voltage (read from the Pi's PMIC) | "Zaby, what's your battery voltage?", "Zaby, are you charged?" |
-| `reset_conversation` | Wipes the server-side conversation history for this bear | "Zaby, let's start over", "Zaby, forget our conversation" |
+| `reset_conversation` | Resets the current conversation history (but not long-term memory) | "Zaby, let's start over", "Zaby, forget our conversation" |
 | `go_to_sleep` | Pauses the bear (paw button resumes) | "Zaby, go to sleep" |
 | `power_down` | Shuts the Raspberry Pi down (~15s grace) | "Zaby, please power down" |
 
 The Pi-side conversation client also speaks "Uh oh, my battery is low please
-charge me!" automatically if the EXT5V rail drops below 4.75 V (checked at
+charge me!" automatically if the EXT5V rail drops below 4.67 V (checked at
 most once every 10 minutes during conversation).
 
 ## Parts list
@@ -52,17 +51,16 @@ most once every 10 minutes during conversation).
 Open the bear housing: cut the ziptie around battery housing, remove 4x screws on housing. Remove the speaker and circuit board. Disconnect the motor-activated internal switch (pulses the mouth motor). 
 Keep the battery housing + switch + mouth motor + neck motor + paw button. Remove bear's "book" and red jacket so it looks steazy. 
 
-The bear has two motors - one for his rotating neck and one for his mouth. The mouth motor turns to a stop, resulting in a lot of back EMF and makes it unsuitable for a motor controller. The bear has a microswitch in his paw which we use to trigger start/stop of the conversation. 
+The bear has two motors - one for his rotating neck and one for his mouth. The mouth motor turns to a stop, resulting in a lot of back EMF and makes it unsuitable for a motor controller hence we use relays. The bear has a microswitch in his paw which we use to trigger start/stop of the conversation. 
 
 Raspberry PI GPIO's trigger the solid state DC-to-DC relays to turn on/off the motors (one for each motor).
 The relays just apply the bear's battery power to each of the mouth and neck motors. Speech envelope tracking converts
 root mean square energy into delay times for the mouth motor so the movement approximately tracks the speech. 
 
-Close the housing up, put the relays outside of housing but inside the fur. Put the Raspberry Pi, USB battery inside the backpack. Consider something to allow air circulation to the
-Canakit fan, e.g. lego pieces. Use self-adhesive velcro to stick WaveShare speaker and USB stick
-to outside of the backback. Remove one of the speakers (stereo no necessary).
+Once wired up, close the housing, put the relays outside of housing but inside the fur. Put the Raspberry Pi, USB battery inside the backpack. Use self-adhesive velcro to stick WaveShare speaker and USB stick
+to outside of the backback. Remove one of the speakers (stereo not necessary).
 
-Note we use an SSD/NVME Raspberry PI as running from sdcard can get slow (particularly boot)
+Note we use an SSD/NVME Raspberry PI as running from sdcard can get slow (particularly boot time).
 
 <img src="Schematic.jpg"/>
 
@@ -84,7 +82,7 @@ Install gcloud on the Raspberry PI (see https://cloud.google.com/sdk/docs/instal
 Run these commands to set the project and login:
 ```
 gcloud init
-gcloud config set project your-project-name
+gcloud config set project <your-project-name>
 gcloud auth application-default login
 ```
 
@@ -141,11 +139,14 @@ sudo systemctl disable cups.service
 sudo systemctl disable bluetooth.service
 ```
 
-## Future ideas (aka make this a real product)
-- Android/iOS app to setup Wi-Fi and configure personality
+Tail GCP logs:
+```
+gcloud beta logging tail 'resource.type="cloud_run_revision" AND resource.labels.service_name="zaby-server"' --project=<your-project-name>
+```
+
+## Future ideas
+- Android/iOS app to setup Wi-Fi, expand cloud to be multi-bear
 - Cost down parts, better housing of parts
-- Safety filters
-- Other commands
 - Camera for eyes so the bear can see
 - Kart for bear to drive around and follow you
 
