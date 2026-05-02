@@ -93,6 +93,11 @@ export MEMORY_UI_PASSWORD=<YOUR_MEMORY_PASSWORD>
  ./deploy.sh
 ```
 
+Tail GCP logs:
+```
+gcloud beta logging tail 'resource.type="cloud_run_revision" AND resource.labels.service_name="zaby-server"' --project=<your-project-name>
+```
+
 ## Run from command line, e.g. ssh'd into Raspberry PI:
 ```
 source zaby-env/bin/activate
@@ -137,11 +142,6 @@ sudo systemctl disable NetworkManager-wait-online.service
 sudo systemctl disable ModemManager.service
 sudo systemctl disable cups.service
 sudo systemctl disable bluetooth.service
-```
-
-Tail GCP logs:
-```
-gcloud beta logging tail 'resource.type="cloud_run_revision" AND resource.labels.service_name="zaby-server"' --project=<your-project-name>
 ```
 
 ## Future ideas
