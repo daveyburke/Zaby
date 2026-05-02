@@ -42,10 +42,20 @@ class BearOnOffState:
             if self.state == self.RUNNING:
                 self.state = self.PAUSING
                 self.client.suspend()
+                # Refresh wakeup_msg in the background so any edit made via
+                # the web UI takes effect on the NEXT wake — without adding
+                # network latency to the wake transition itself.
+                threading.Thread(target=self._refresh_wakeup_msg, daemon=True).start()
             elif self.state == self.PAUSED:
                 self.state = self.UNPAUSING
                 self.client.resume()
                 self.pause_event.notify()
+
+    def _refresh_wakeup_msg(self):
+        new_msg = self.client.get_wakeup_msg()
+        if new_msg and new_msg != self.wakeup_msg:
+            print(f"wakeup_msg refreshed: {new_msg!r}")
+            self.wakeup_msg = new_msg
     
     def handle_state_machine(self, go_to_sleep):
         if (go_to_sleep): self.paw_button_callback()

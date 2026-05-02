@@ -22,7 +22,7 @@ COMPACT_MODEL = "gemini-3-flash-preview"  # used by _compact() to dedup MEMORY.m
 COMPACT_EVERY = 5                      # every Nth append() triggers automatic compaction
 RRF_K = 60                            # standard reciprocal rank fusion constant
 SEED = (
-    "# Zaby's Memory\n\n"
+    "# Memory\n\n"
     "_Things I've learned about the user and the stories we've made up together._\n\n"
 )
 
