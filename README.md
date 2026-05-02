@@ -10,9 +10,19 @@ Gemini 3.0 Flash. It includes a GCP Cloud Run server to reduce network round tri
 Runs on a Raspberry Pi 5. Bear animatronics include speech
 envelope-tracked mouth movements. 
 
+Safety filters and prompts are applied to keep the converstation child appropriate.
+
+
 <img src="Zaby.jpg" width="300"/> <img src="Zaby Back.jpg" width="300"/>
 
 Here's a demo of the bear: https://x.com/davey_burke/status/1903682259003310308
+
+## Memory and System Prompt
+Zaby uses a long-term memory inspired by OpenClaw. Memory is stored in a markdown file and
+an sqlite vector database is used for retrieval augmented generation. The retrieval uses both
+cosine similarity and full text search with fused ranking. The system prompt is bootsrapped with
+the memory and lookup happens at inference time with a search_memory tool. Both the system prompt
+and the memory file can be viewed/edited at ZABY_SERVER_URL/memory with username/password YOUR_MEMORY_PASSWORD.
 
 ## Voice tools
 The Gemini agent (cloud_run/ai_agent.py) is wired up with these tools — phrase
@@ -80,7 +90,9 @@ gcloud auth application-default login
 
 Get an API key from aistudio.google.com. To deploy server to GCP run:
 ```
-GEMINI_API_KEY=<YOUR_GEMINI_API_KEY> ./deploy.sh
+export GEMINI_API_KEY=<YOUR_GEMINI_API_KEY>
+export MEMORY_UI_PASSWORD=<YOUR_MEMORY_PASSWORD>
+ ./deploy.sh
 ```
 
 ## Run from command line, e.g. ssh'd into Raspberry PI:

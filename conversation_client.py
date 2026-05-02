@@ -228,6 +228,18 @@ class ConversationClient:
                 out_stream.stop_stream()
                 out_stream.close()
 
+    def get_wakeup_msg(self):
+        """Fetches the configurable wakeup message from the server. Returns
+        None on error so the caller can fall back to a hardcoded default —
+        the bear should still be able to wake up if Cloud Run is unreachable."""
+        try:
+            r = requests.get(f"{self.server_url}/wakeup", timeout=5)
+            r.raise_for_status()
+            return r.text.strip()
+        except Exception as e:
+            print(f"get_wakeup_msg failed: {e}")
+            return None
+
     def speak(self, text):
         """Synthesize and play a single utterance (used for the wakeup line)."""
         if self.suspended:

@@ -12,6 +12,11 @@ if [[ -z "${GEMINI_API_KEY:-}" ]]; then
   exit 1
 fi
 
+if [[ -z "${MEMORY_UI_PASSWORD:-}" ]]; then
+  echo "MEMORY_UI_PASSWORD not set" >&2
+  exit 1
+fi
+
 gcloud run deploy "$SERVICE_NAME" \
   --source . \
   --project "$PROJECT_ID" \
@@ -22,4 +27,6 @@ gcloud run deploy "$SERVICE_NAME" \
   --cpu 1 \
   --memory 512Mi \
   --timeout 600 \
-  --set-env-vars "GEMINI_API_KEY=${GEMINI_API_KEY}"
+  --add-volume "name=memory,type=cloud-storage,bucket=zaby-memory" \
+  --add-volume-mount "volume=memory,mount-path=/mnt/memory" \
+  --set-env-vars "GEMINI_API_KEY=${GEMINI_API_KEY},MEMORY_UI_PASSWORD=${MEMORY_UI_PASSWORD}"

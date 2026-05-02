@@ -29,14 +29,15 @@ def main_loop():
     if not server_url:
         raise RuntimeError("ZABY_SERVER_URL environment variable is not set")
 
-    wakeup_msg = "Hi! I'm Zaby, how are you today?"
-
     # Fresh client_id every boot → server drops prior conversation history;
     # paw-button pause/resume keeps the same ID so history survives.
     client_id = uuid.uuid4().hex
 
     bear_animatronics = BearAnimatronics()
     client = ConversationClient(server_url, bear_animatronics, client_id=client_id)
+    # Wakeup message is editable from the server's /memory web UI; fall back
+    # to a hardcoded default if the server is unreachable at boot.
+    wakeup_msg = client.get_wakeup_msg() or "Hi! I'm Zaby, how are you today?"
     bear_state = BearOnOffState(client, wakeup_msg)
 
     bear_state.beep()  # power on beep

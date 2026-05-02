@@ -41,7 +41,7 @@ sudo journalctl -u zaby.service -f
 
 ### Pi side (`main.py`, `conversation_client.py`, `bear_state.py`, `bear_animatronics.py`)
 
-**main.py** — entry point. Generates a fresh `client_id` (UUID) each boot so server-side conversation history resets on reboot but survives paw-button pauses. Wires up the animatronics, `ConversationClient`, and `BearOnOffState`, then runs the main loop.
+**main.py** — entry point. Generates a fresh `client_id` (UUID) each boot and sends it on the WS. The server no longer keys *agent state* by it (single-user / single-bear), but does use a change in `client_id` as a "Pi rebooted" signal to wipe in-RAM conversation history. Long-term memory in `MEMORY.md` survives the reset. Wires up the animatronics, `ConversationClient`, and `BearOnOffState`, then runs the main loop.
 
 **conversation_client.py** — WebSocket client for the server. `converse()` opens `/converse`, streams mic PCM up on a send thread, and receives four kinds of frames back: `transcript` (text), `response` (text), PCM binary frames, and `done` (with `go_to_sleep` / `power_down` flags). PCM bytes are drained into `pcm_q` at network speed by the recv loop; a separate `_playback_loop` thread pulls from the queue and writes to PyAudio at real-time speed. This decoupling keeps the WebSocket lifetime ≈ "Gemini+TTS production time" regardless of reply length, avoiding Cloud Run / LB idle timeouts during playback. `speak()` is a simpler HTTP POST to `/speak` used only for the wakeup line.
 
@@ -51,9 +51,11 @@ sudo journalctl -u zaby.service -f
 
 ### Server side (`cloud_run/`)
 
-**server.py** — FastAPI app with `/healthz`, `/speak` (text → PCM bytes), and `/converse` (WebSocket). `/converse` runs STT in a thread while draining incoming audio frames, then streams Gemini tokens through a `SentenceBuffer` so each completed sentence hits TTS before the rest of the reply is generated. First sentence's PCM usually reaches the Pi while later sentences are still synthesizing. `_agents: dict[str, AIAgent]` keys one agent per bear by the `client_id` query param.
+**server.py** — FastAPI app with `/healthz`, `/speak` (text → PCM bytes), `/converse` (WebSocket), `/wakeup` (plain-text wakeup phrase, fetched by the Pi at boot — unauth so the Pi can call it), and `/memory` (HTML + form POSTs, HTTP basic auth). `/converse` runs STT in a thread while draining incoming audio frames, then streams Gemini tokens through a `SentenceBuffer` so each completed sentence hits TTS before the rest of the reply is generated. First sentence's PCM usually reaches the Pi while later sentences are still synthesizing. A single global `AIAgent` is held at module level — no per-client_id keying.
 
-**ai_agent.py** — Gemini 3 Flash (`gemini-3-flash-preview`) with explicit history management. `interact_stream()` yields text chunks and drives the manual function-call loop: stream → collect any `function_call` parts → execute → append `function_response` → stream again. Automatic function calling is disabled (`AutomaticFunctionCallingConfig(disable=True)`) because automatic FC + streaming hangs (googleapis/python-genai#331). Tools: `reset_conversation`, `get_the_time` (uses `self.tz` from the WS `?tz=` param), `go_to_sleep`, `power_down`. `GEMINI_API_KEY` is read from the environment.
+**ai_agent.py** — Gemini 3 Flash (`gemini-3-flash-preview`) with explicit history management. `interact_stream()` yields text chunks and drives the manual function-call loop: stream → collect any `function_call` parts → execute → append `function_response` → stream again. Automatic function calling is disabled (`AutomaticFunctionCallingConfig(disable=True)`) because automatic FC + streaming hangs (googleapis/python-genai#331). The system prompt + memory text are rebuilt fresh into `_build_config()` on every turn so live edits to `INSTRUCTIONS.md` and `MEMORY.md` take effect immediately. Tools: `reset_conversation`, `get_the_time` (uses `self.tz` from the WS `?tz=` param), `get_battery_voltage`, `go_to_sleep`, `power_down`, `save_memory`, `search_memory`. `GEMINI_API_KEY` is read from the environment.
+
+**memory.py** — long-term memory. `MEMORY.md` on the GCS volume is the source of truth (human-readable, editable from the web UI). Mirrored into a sqlite-vec `chunks` table (paragraph chunking, no overlap, `text-embedding-004` 768-dim) and an FTS5 `chunks_fts` table; `search()` over-fetches top-N from each side and fuses with reciprocal rank fusion (RRF). `_reindex()` does per-chunk hash skipping — only paragraphs whose sha1 changed get re-embedded. A file-level hash in the `meta` table short-circuits the whole reindex when MEMORY.md is byte-identical to last index.
 
 **speech_recognition.py** — Google Speech streaming recognition. Consumes a `queue.Queue` of PCM bytes fed by the WS handler, returns the final transcript.
 
@@ -86,10 +88,18 @@ PyAudio → PortAudio (pulse hostapi) → pipewire-pulse → PipeWire → WaveSh
 - **GCP STT/TTS**: Application Default Credentials inside the Cloud Run container (the service's runtime SA needs Speech + TTS roles).
 
 ### Personality
-System prompt lives in `cloud_run/server.py` as `MODEL_INSTR`. Editing it requires redeploying the server.
+The hardcoded prompt `DEFAULT_MODEL_INSTR` lives in `cloud_run/server.py`, but the *live* prompt is whatever is in `INSTRUCTIONS.md` on the GCS volume. Same pattern for the wakeup phrase: `DEFAULT_WAKEUP_MSG` in code, live value in `WAKEUP.txt`, fetched by the Pi at boot via `GET /wakeup`. The web UI (`/memory`) lets you edit both; **Reset** overwrites the file with the hardcoded default. The next turn (or boot, for wakeup) picks up edits — no redeploy needed.
+
+### Long-term memory
+- `MEMORY.md` on the GCS volume is the source of truth — human-readable bullets the bear has saved, plus anything you add by hand via the web UI.
+- It is mirrored into a sqlite-vec table + FTS5 table at `memory.db`, fused with RRF for hybrid semantic+keyword recall.
+- The bear's two memory tools: `save_memory(fact)` appends a bullet and re-indexes; `search_memory(query)` runs the hybrid search.
+- Eager-load + RAG: `MEMORY.md` is *also* injected into the system prompt every turn (small enough that this is cheap).
+- Web UI at `/memory` — HTTP basic auth, password from `MEMORY_UI_PASSWORD` env var. Three textareas (system prompt, wakeup message, memory), each with Save and Reset buttons.
+- **Deploy pre-req**: `gsutil mb -p zaby-453603 -l us-central1 gs://zaby-memory` once before the first deploy. The bucket is mounted at `/mnt/memory` via `--add-volume type=cloud-storage` in `deploy.sh`.
 
 ### Suspend/resume contract
 Anything that drives audio or motors should expose `suspend()` and `resume()` and check `self.suspended` in its loops so paw-button presses can interrupt mid-utterance.
 
 ### History lifecycle
-Per-`client_id` `AIAgent` instances live in server-side memory. A Pi reboot → new UUID → fresh history. Paw-button pause/resume → same UUID → history preserved. No cross-container persistence — a Cloud Run instance recycle also drops history.
+A single global `AIAgent` lives in server-side memory; in-context conversation history persists until any of: the user says "Zaby start over" (which calls `reset_conversation`), the Pi reboots (a fresh `client_id` triggers `AIAgent.note_client()` to wipe history), or the Cloud Run instance recycles. Durable facts should be written to long-term memory via `save_memory` instead of relying on conversation history.
