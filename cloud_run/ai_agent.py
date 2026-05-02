@@ -176,7 +176,7 @@ class AIAgent:
         return f"{self.battery_voltage:.2f}V"
 
     def go_to_sleep(self):
-        """Puts Zaby to sleep (pause mode). Only call this function when the user explicitly says 'Zaby go to sleep' or 'Zaby sleep'. Do not call for general goodbye or end of conversation."""
+        """Puts Zaby to sleep (pause mode). Only call this function when the user explicitly says 'Zaby go to sleep' or 'Zaby sleep'. Do not call for general goodbye or end of conversation. Keep response short and concise."""
         print("API called: go_to_sleep")
         self.suspend = True
 

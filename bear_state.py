@@ -85,6 +85,10 @@ class BearOnOffState:
         # Officially suspend now — closes WS (no-op if barged), suspends
         # animatronics, sets self.suspended.
         self.client.suspend()
+        if not announce:
+            # Voice-triggered: bear has finished saying its own goodbye in
+            # the response, so a trailing beep marks "I'm asleep now". 
+            self.beep()
 
     def _refresh_wakeup_msg(self):
         new_msg = self.client.get_wakeup_msg()
