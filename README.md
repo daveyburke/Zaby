@@ -6,6 +6,10 @@ up or interrupt him mid-sentence; long-press and he'll say "Going to sleep" and
 go quiet. Zaby has a long-term memory and will remember key facts. Zaby
 responds to a handful of voice commands listed below.
 
+<img src="Zaby.jpg" width="300"/> <img src="Zaby Back.jpg" width="300"/>
+
+See a demo of the bear here: https://x.com/davey_burke/status/1903682259003310308
+
 ## Architecture
 Zaby uses Google Cloud Speech-to-Text and Text-to-Speech APIs and is powered by
 Gemini 3.0 Flash. It includes a GCP Cloud Run server to reduce network round trips.
@@ -14,19 +18,18 @@ envelope-tracked mouth movements and synchronized neck movements.
 
 Safety filters and prompts are applied to keep the converstation child appropriate.
 
-<img src="Zaby.jpg" width="300"/> <img src="Zaby Back.jpg" width="300"/>
-
-See a demo of the bear here: https://x.com/davey_burke/status/1903682259003310308
-
-## Memory and system prompt (personality)
+## Memory
 Zaby uses a long-term memory inspired by OpenClaw. Memory is stored in a markdown file and
 an sqlite vector database is used for retrieval augmented generation. The retrieval uses both
 cosine similarity and full text search with fused ranking. The system prompt is bootstrapped with
-the memory and look up happens at inference time with a search_memory() tool. Both the system prompt (personality)
-and the memory file can be viewed/edited at ZABY_SERVER_URL/memory (username/password is YOUR_MEMORY_PASSWORD).
+the memory and look up happens at inference time with a search_memory() tool. The memory file can be
+viewed/edited via the Web UI at ZABY_SERVER_URL/memory (username/password is YOUR_MEMORY_PASSWORD).
+
+## Personality
+The personality and wakeup message can be edited via the Web UI at ZABY_SERVER_URL/memory (username/password is YOUR_MEMORY_PASSWORD).
 
 ## Voice tools
-The Gemini agent (cloud_run/ai_agent.py) is wired up with these tools - phrase
+The Gemini agent (cloud_run/ai_agent.py) is wired up with these tools. Phrase
 the request naturally and Zaby will pick the right one:
 
 | Tool | What it does | Example phrases |
@@ -37,9 +40,7 @@ the request naturally and Zaby will pick the right one:
 | `go_to_sleep` | Puts the bear to sleep (short-press paw to wake; same effect as long-press paw) | "Zaby, go to sleep" |
 | `power_down` | Shuts the Raspberry Pi down (~15s grace) | "Zaby, please power down" |
 
-The Pi-side conversation client also speaks "Uh oh, my battery is low please
-charge me!" automatically if the EXT5V rail drops below 4.67 V (checked at
-most once every 10 minutes during conversation).
+Zaby will say "Uh oh, my battery is low please charge me!" automatically if the EXT5V rail drops below 4.67 V (checked at most once every 10 minutes during conversation).
 
 ## Parts list
 - Story Time Teddy - https://www.cuddle-barn.com/products/storytime-teddie
