@@ -6,9 +6,13 @@ import os
 from gpiozero import Button
 
 class BearOnOffState:
-    """Class to handle start/stop of the bear via paw button. A bit gnarly to handle
-    the asnychronous nature of button press. Synthesizer/recognizer/animatronics need
-    to be able to be suspended/resumed at any time
+    """Paw-button state machine for the bear. Two paw gestures, both routed
+    through gpiozero's built-in hold-time / bounce-time:
+      - short press (release < 1s)  → engage:
+          PAUSED → wake (resume + wakeup line)
+          RUNNING + bear talking → barge-in (interrupt mid-utterance)
+          RUNNING + bear listening → no-op (already engaged)
+      - long press (≥ 1s held)      → sleep (same as 'Zaby go to sleep')
     """
     def __init__(self, client, wakeup_msg):
         self.client = client
@@ -24,41 +28,75 @@ class BearOnOffState:
         self.lock = threading.Lock()
         self.pause_event = threading.Condition(self.lock)
 
-        self.DEBOUNCE_TIME = 500
-        self.last_button_press_time = 0
-        self.button = Button(2)
-        self.button.when_pressed = self.paw_button_callback
+        # gpiozero's hold_time fires when_held automatically after 1s held.
+        # bounce_time covers electrical bounce — replaces the manual stopwatch.
+        self.button = Button(2, hold_time=1.0, bounce_time=0.05)
+        self.button.when_held = self._paw_held
+        self.button.when_released = self._paw_released
+        self._was_held = False  # set by when_held; consumed by when_released
 
-    def paw_button_callback(self):
-        current_time = int(time.time() * 1000)
-        if (current_time - self.last_button_press_time) < self.DEBOUNCE_TIME:
+    def _paw_held(self):
+        """Long-press (≥ 1s) — bear says 'Going to sleep' then transitions
+        to PAUSED. Same end state as the voice command 'Zaby go to sleep'.
+        Runs on a thread because the spoken announcement is ~1s and we
+        don't want to block the GPIO callback."""
+        self._was_held = True
+        self.beep()  # immediate "long-press registered" feedback before the announcement
+        threading.Thread(
+            target=lambda: self._goto_sleep(announce=True), daemon=True,
+        ).start()
+
+    def _paw_released(self):
+        if self._was_held:
+            self._was_held = False  # consume the long-press flag
             return
-        self.last_button_press_time = current_time
-
         # Hack - force volume level (sometimes lowers by itself!)
         os.system("amixer -c 2 set Speaker Playback Volume 90%")  # WaveShare USB sound card
-        self.beep()
         with self.lock:  # runs on gpio thread
-            if self.state == self.RUNNING:
-                self.state = self.PAUSING
-                self.client.suspend()
-                # Refresh wakeup_msg in the background so any edit made via
-                # the web UI takes effect on the NEXT wake — without adding
-                # network latency to the wake transition itself.
-                threading.Thread(target=self._refresh_wakeup_msg, daemon=True).start()
-            elif self.state == self.PAUSED:
+            if self.state == self.PAUSED:
+                self.beep()
                 self.state = self.UNPAUSING
                 self.client.resume()
                 self.pause_event.notify()
+            elif self.state == self.RUNNING and self.client.is_speaking():
+                # Mid-utterance interrupt — abort speaker + close WS but stay
+                # in RUNNING so handle_state_machine re-enters converse()
+                # without playing the wakeup line. No beep — the abrupt
+                # silence is the audible signal that the press registered.
+                self.client.barge_in()
+            # else: RUNNING + listening → already engaged; no-op, no beep.
+
+    def _goto_sleep(self, announce):
+        with self.lock:
+            if self.state != self.RUNNING:
+                return  # already paused or transitioning
+            self.state = self.PAUSING
+            # Refresh wakeup_msg in the background so any edit made via the
+            # web UI takes effect on the NEXT wake — without adding network
+            # latency to the wake transition itself.
+            threading.Thread(target=self._refresh_wakeup_msg, daemon=True).start()
+        if announce:
+            # Stop any in-flight bear utterance so the announcement isn't
+            # talked over. barge_in (not suspend) — suspend would block speak().
+            self.client.barge_in()
+            # Small gap so the beep and the announcement don't run together.
+            time.sleep(0.2)
+            self.client.speak("Going to sleep")
+        # Officially suspend now — closes WS (no-op if barged), suspends
+        # animatronics, sets self.suspended.
+        self.client.suspend()
 
     def _refresh_wakeup_msg(self):
         new_msg = self.client.get_wakeup_msg()
         if new_msg and new_msg != self.wakeup_msg:
             print(f"wakeup_msg refreshed: {new_msg!r}")
             self.wakeup_msg = new_msg
-    
+
     def handle_state_machine(self, go_to_sleep):
-        if (go_to_sleep): self.paw_button_callback()
+        if go_to_sleep:
+            # Voice-triggered: bear already said its goodbye in the response,
+            # so don't announce again. Synchronous (no thread) — no audio to wait on.
+            self._goto_sleep(announce=False)
 
         speak_wakeup = False
         with self.lock:  # runs on main thread

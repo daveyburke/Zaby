@@ -66,8 +66,13 @@ class BearAnimatronics:
                 print("-O-\r", end="", flush=True)
 
     def end_audio(self):
-        """Finish a streaming utterance."""
+        """Finish a streaming utterance. Also kills the mouth pulse cycle so
+        the motor doesn't keep flapping for up to ~250 ms after a barge-in.
+        Resetting _pulse_mouth_value to 0 turns any racing event from the
+        mouth thread into a no-op (value < MOUTH_CLOSED_RMS skips the pulse)."""
         self.neck_motor.off()
+        self.mouth_motor.off()
+        self._pulse_mouth_value = 0.0
         # Wipe the last mouth indicator so it doesn't linger on the log.
         print("\r\033[K", end="", flush=True)
 

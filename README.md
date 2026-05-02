@@ -1,9 +1,10 @@
 # Zaby
 Zaby is an AI-powered teddy bear envisioned by a 7 yr old called Zach and built by his dad Dave.
 Zaby is a clever, pedagogical, and funny teddy bear that loves talking math (although
-you can easily change his personality via model_instr in main.py). Press his paw
-to start/stop the conversation. Zaby has a long-term memory and ability to change his
-personality. Zaby responds to a handful of voice commands listed below.
+you can easily change his personality via the web UI). Short-press his paw to wake him
+up or interrupt him mid-sentence; long-press (≥1s) and he'll say "Going to sleep" and
+go quiet. Zaby has a long-term memory and ability to change his personality. Zaby
+responds to a handful of voice commands listed below.
 
 Zaby uses Google Cloud Speech-to-Text and Text-to-Speech APIs and is powered by
 Gemini 3.0 Flash. It includes a GCP Cloud Run server to reduce network round trips.
@@ -32,7 +33,7 @@ the request naturally and Zaby will pick the right one:
 | `get_the_time` | Speaks the current time in the Pi's local timezone | "Zaby, what time is it?" |
 | `get_battery_voltage` | Speaks the bear's input voltage (read from the Pi's PMIC) | "Zaby, what's your battery voltage?", "Zaby, are you charged?" |
 | `reset_conversation` | Resets the current conversation history (but not long-term memory) | "Zaby, let's start over", "Zaby, forget our conversation" |
-| `go_to_sleep` | Pauses the bear (paw button resumes) | "Zaby, go to sleep" |
+| `go_to_sleep` | Puts the bear to sleep (short-press paw to wake; same effect as long-press paw) | "Zaby, go to sleep" |
 | `power_down` | Shuts the Raspberry Pi down (~15s grace) | "Zaby, please power down" |
 
 The Pi-side conversation client also speaks "Uh oh, my battery is low please

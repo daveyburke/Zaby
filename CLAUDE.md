@@ -45,7 +45,7 @@ sudo journalctl -u zaby.service -f
 
 **conversation_client.py** — WebSocket client for the server. `converse()` opens `/converse`, streams mic PCM up on a send thread, and receives four kinds of frames back: `transcript` (text), `response` (text), PCM binary frames, and `done` (with `go_to_sleep` / `power_down` flags). PCM bytes are drained into `pcm_q` at network speed by the recv loop; a separate `_playback_loop` thread pulls from the queue and writes to PyAudio at real-time speed. This decoupling keeps the WebSocket lifetime ≈ "Gemini+TTS production time" regardless of reply length, avoiding Cloud Run / LB idle timeouts during playback. `speak()` is a simpler HTTP POST to `/speak` used only for the wakeup line.
 
-**bear_state.py** — paw-button state machine (RUNNING/PAUSING/PAUSED/UNPAUSING/TERMINATING). GPIO 2 with 500ms debounce; pygame beep on transitions; forces the WaveShare volume to 90% on every press (hardware drifts).
+**bear_state.py** — paw-button state machine (RUNNING/PAUSING/PAUSED/UNPAUSING/TERMINATING). GPIO 2 via gpiozero with `hold_time=1.0` and `bounce_time=0.05`, two handlers: short-press (`when_released`, < 1 s) is the **engage** action — wake from PAUSED, or `client.barge_in()` mid-utterance, or no-op if the bear is already listening; long-press (`when_held`, ≥ 1 s) is **sleep**, equivalent to the voice command "Zaby go to sleep". Different beep tones distinguish short vs long press. Volume is forced to 90% on every short press (hardware drifts). Barge-in does NOT change state — the main loop just re-enters `converse()` with no wakeup line, so the user hears beep → silence → ready to talk.
 
 **bear_animatronics.py** — streaming PCM consumer: `start_audio(rate)`, `feed_audio(pcm)`, `end_audio()`. Computes RMS envelope at 200 Hz in `feed_audio`; a dedicated mouth-motor thread converts RMS → pulse durations (0 / 0.15s / 0.25s). Neck motor runs continuously while audio is streaming.
 
@@ -76,7 +76,7 @@ PyAudio → PortAudio (pulse hostapi) → pipewire-pulse → PipeWire → WaveSh
 
 ### GPIO / hardware
 
-- GPIO 2: paw button (input, pull-up)
+- GPIO 2: paw button (input, pull-up). Short press = engage (wake / barge-in mid-utterance). Long press (≥ 1 s) = sleep (same as the "Zaby go to sleep" voice command).
 - GPIO 26: mouth motor (on/off pulses via SSR — high back-EMF, duration encodes amplitude)
 - GPIO 19: neck motor (on while audio is playing)
 - WaveShare USB audio on `hw:2,0`; `asound.conf` sets it as `pcm.!default`.

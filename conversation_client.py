@@ -56,6 +56,7 @@ class ConversationClient:
 
         self.stream = None
         self.ws = None
+        self._out_stream = None  # exposed so barge_in() can stop_stream() from outside the playback thread
         self._last_battery_check = float("-inf")  # fires on first converse()
         self.last_voltage = None  # refreshed at the start of each converse()
 
@@ -198,8 +199,9 @@ class ConversationClient:
 
     def _playback_loop(self, pcm_q):
         """Pulls PCM chunks from pcm_q and plays them in real time. Runs until
-        a None sentinel arrives or self.suspended flips True."""
-        out_stream = None
+        a None sentinel arrives or self.suspended flips True. The output stream
+        is held on self so barge_in() can call stop_stream() from outside this
+        thread to abort an in-flight write."""
         audio_started = False
         try:
             while True:
@@ -212,21 +214,29 @@ class ConversationClient:
                 if data is None or self.suspended:
                     break
                 if not audio_started:
-                    out_stream = self._open_output_stream()
+                    self._out_stream = self._open_output_stream()
                     self.bear_animatronics.start_audio(PCM_SAMPLE_RATE)
                     audio_started = True
                 # Write first, THEN feed the envelope. write() blocks until
                 # PortAudio's buffer accepts the data, so by the time we drive
                 # the mouth, the chunk is queued ~ where it will play. Calling
                 # feed_audio first leads the audio by one chunk (~128 ms).
-                out_stream.write(data)
+                try:
+                    self._out_stream.write(data)
+                except Exception:
+                    # Another thread called stop_stream() (barge-in) — exit cleanly.
+                    break
                 self.bear_animatronics.feed_audio(data)
         finally:
             if audio_started:
                 self.bear_animatronics.end_audio()
-            if out_stream:
-                out_stream.stop_stream()
-                out_stream.close()
+            if self._out_stream:
+                try:
+                    self._out_stream.stop_stream()
+                    self._out_stream.close()
+                except Exception:
+                    pass
+                self._out_stream = None
 
     def get_wakeup_msg(self):
         """Fetches the configurable wakeup message from the server. Returns
@@ -257,6 +267,30 @@ class ConversationClient:
                 self._stream_pcm(r.iter_content(chunk_size=PCM_CHUNK))
         except Exception as e:
             print(f"Error occurred: {e}")
+
+    def is_speaking(self):
+        """True iff playback output is currently open. Used by the paw-button
+        callback to decide between barge-in and pause."""
+        return self._out_stream is not None
+
+    def barge_in(self):
+        """Abort the current bear utterance NOW: kill the speaker mid-write
+        and close the WS so the server abandons response generation. Does NOT
+        change any conversation state — the caller stays in RUNNING and the
+        main loop restarts converse() on the next iteration. Safe to call when
+        not speaking — both stop_stream and ws.close are no-ops on closed
+        objects."""
+        print("Barge-in")
+        if self._out_stream:
+            try:
+                self._out_stream.stop_stream()
+            except Exception:
+                pass
+        if self.ws:
+            try:
+                self.ws.close()
+            except Exception:
+                pass
 
     def suspend(self):
         self.suspended = True
