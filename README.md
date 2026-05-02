@@ -1,21 +1,22 @@
 # Zaby
 Zaby is an AI-powered teddy bear envisioned by a 7 yr old called Zach and built by his dad Dave.
-Zaby is a clever, pedagogical, and funny teddy bear that loves talking math (although
+Zaby is clever, pedagogical, and funny, and loves talking math (although
 you can easily change his personality via the web UI). Short-press his paw to wake him
-up or interrupt him mid-sentence; long-press (≥1s) and he'll say "Going to sleep" and
-go quiet. Zaby has a long-term memory and ability to change his personality. Zaby
+up or interrupt him mid-sentence; long-press and he'll say "Going to sleep" and
+go quiet. Zaby has a long-term memory and will remember key facts. Zaby
 responds to a handful of voice commands listed below.
 
+## Architecture
 Zaby uses Google Cloud Speech-to-Text and Text-to-Speech APIs and is powered by
 Gemini 3.0 Flash. It includes a GCP Cloud Run server to reduce network round trips.
-Runs on a Raspberry Pi 5. Bear animatronics include speech
+The client runs on a Raspberry Pi 5. Bear animatronics include speech
 envelope-tracked mouth movements and synchronized neck movements.
 
 Safety filters and prompts are applied to keep the converstation child appropriate.
 
 <img src="Zaby.jpg" width="300"/> <img src="Zaby Back.jpg" width="300"/>
 
-Here's a demo of the bear: https://x.com/davey_burke/status/1903682259003310308
+See a demo of the bear here: https://x.com/davey_burke/status/1903682259003310308
 
 ## Memory and system prompt (personality)
 Zaby uses a long-term memory inspired by OpenClaw. Memory is stored in a markdown file and
@@ -25,7 +26,7 @@ the memory and look up happens at inference time with a search_memory() tool. Bo
 and the memory file can be viewed/edited at ZABY_SERVER_URL/memory (username/password is YOUR_MEMORY_PASSWORD).
 
 ## Voice tools
-The Gemini agent (cloud_run/ai_agent.py) is wired up with these tools — phrase
+The Gemini agent (cloud_run/ai_agent.py) is wired up with these tools - phrase
 the request naturally and Zaby will pick the right one:
 
 | Tool | What it does | Example phrases |
@@ -49,7 +50,7 @@ most once every 10 minutes during conversation).
 - Mini backpack - https://www.amazon.com/dp/B0DL2LTMPP
 
 ## Connections / Assembly
-Open the bear housing: cut the ziptie around battery housing, remove 4x screws on housing. Remove the speaker and circuit board. Disconnect the motor-activated internal switch (pulses the mouth motor). 
+Open the bear housing: cut the ziptie around battery housing, remove 4x side screws on housing. Remove the speaker and circuit board. Disconnect the motor-activated internal switch (what pulses the mouth motor). 
 Keep the battery housing + switch + mouth motor + neck motor + paw button. Remove bear's "book" and red jacket so it looks steazy. 
 
 The bear has two motors - one for his rotating neck and one for his mouth. The mouth motor turns to a stop, resulting in a lot of back EMF and makes it unsuitable for a motor controller hence we use relays. The bear has a microswitch in his paw which we use to trigger start/stop of the conversation. 
