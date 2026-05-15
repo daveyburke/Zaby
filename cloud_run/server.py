@@ -151,7 +151,7 @@ _PAGE = """<!doctype html>
   </p>
 </form>
 
-<h2>System Prompt</h2>
+<h2>Personality (System Prompt)</h2>
 <p style="color:#666">Editable personality and behavior. <b>Reset</b> reverts to the default prompt.</p>
 <form method="POST" action="/memory/instructions">
   <textarea name="content" rows="12" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:14px">{instructions}</textarea>
